@@ -1,0 +1,86 @@
+name: S3 Core CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - "packages/**"
+      - ".github/workflows/s3-core-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - "packages/**"
+      - ".github/workflows/s3-core-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-core-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-test:
+    name: S3 Compatibility Tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    env:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_REGION: us-east-1
+      MINIO_BUCKET: healthpush-ci
+      MINIO_ENDPOINT: http://127.0.0.1:9000
+      MINIO_IMAGE: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+      MINIO_MC_IMAGE: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+
+    services:
+      minio:
+        image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+        command: server /data --console-address ":9001"
+        options: >-
+          --health-cmd "curl --silent --fail http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Swift
+        uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a # v2.4.0
+        with:
+          swift-version: "6.0"
+
+      - name: Verify toolchain
+        run: |
+          swift --version
+          curl --silent --fail "$MINIO_ENDPOINT/minio/health/live" >/dev/null
+
+      - name: Create MinIO bucket
+        run: |
+          docker run --rm \
+            --network host \
+            -e MC_HOST_healthpush="http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@127.0.0.1:9000" \
+            "$MINIO_MC_IMAGE" \
+            mb --ignore-existing "healthpush/$MINIO_BUCKET"
+
+      - name: Run S3 compatibility tests
+        run: |
+          swift test \
+            --package-path packages/HealthPushStorageCore \
+            --build-path "$RUNNER_TEMP/healthpush-storage-core-build"
+        env:
+          MINIO_ENDPOINT: ${{ env.MINIO_ENDPOINT }}
+          MINIO_BUCKET: ${{ env.MINIO_BUCKET }}
+          MINIO_REGION: ${{ env.MINIO_REGION }}
+          MINIO_ACCESS_KEY_ID: ${{ env.MINIO_ROOT_USER }}
+          MINIO_SECRET_ACCESS_KEY: ${{ env.MINIO_ROOT_PASSWORD }}

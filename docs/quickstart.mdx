@@ -1,0 +1,86 @@
+---
+title: Quickstart
+description: Run HealthPush, grant Health access, and connect your first destination.
+---
+
+This is the fastest way to get HealthPush running and syncing.
+
+At the moment, the app is run from source, so this page covers both the local build steps and the first in-app setup flow.
+
+## Prerequisites
+
+- Xcode 16 or newer
+- iOS 17 simulator or device
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+- Python 3.12 or newer only if you want to work on the Home Assistant integration locally
+
+## Build And Run
+
+```bash
+git clone https://github.com/danburtenshaw/HealthPush.git
+cd HealthPush/ios/HealthPush
+brew install xcodegen
+xcodegen
+open HealthPush.xcodeproj
+```
+
+Build and run from Xcode on an iPhone or simulator.
+
+When the app opens for the first time:
+
+1. Read the welcome flow.
+2. Grant HealthKit access for the metrics you want to export.
+3. Add at least one destination.
+4. Run a manual sync once to confirm the path works end to end.
+
+## Pick A First Destination
+
+- Use [Amazon S3](/setup-amazon-s3) if you want a simple direct export to your own bucket.
+- Use [Home Assistant](/setup-home-assistant) if you want live sensors inside HA dashboards and automations.
+
+## What To Expect After Setup
+
+- Manual sync happens immediately when you tap `Sync Now`.
+- Background sync is approximate. HealthPush asks iOS to run after your chosen interval, but iOS may delay it.
+- New Health data can also trigger background work through HealthKit observer delivery.
+- If you force-quit the app, background sync stops until the app is opened again.
+
+Read [How Sync Really Works](/sync-behavior) before relying on a tight sync cadence.
+
+## Recommended First Check
+
+After saving your first destination:
+
+1. Tap `Sync Now`.
+2. Confirm the destination received data.
+3. Leave the app installed and avoid force-quitting it.
+4. Check again later to confirm background sync is happening often enough for your use case.
+
+## More Help
+
+- [Privacy & Open Source](/privacy-and-open-source)
+- [How Sync Really Works](/sync-behavior)
+- [Set Up Home Assistant](/setup-home-assistant)
+- [Set Up Amazon S3](/setup-amazon-s3)
+
+## Developer Notes
+
+If you are contributing rather than just trying the app, the main test commands are below.
+
+### iOS Tests
+
+```bash
+cd ios/HealthPush
+xcodegen
+xcodebuild test \
+  -project HealthPush.xcodeproj \
+  -scheme HealthPush \
+  -destination 'platform=iOS Simulator,name=iPhone 16'
+```
+
+### Home Assistant Tests
+
+```bash
+cd integrations/homeassistant
+python -m pytest
+```

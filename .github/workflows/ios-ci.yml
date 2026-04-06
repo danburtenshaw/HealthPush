@@ -1,0 +1,106 @@
+name: iOS CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      PROJECT_DIR: ios/HealthPush
+      SCHEME: HealthPush
+      BUILD_DESTINATION: "generic/platform=iOS Simulator"
+      TEST_DESTINATION: "platform=iOS Simulator,name=iPhone 16,OS=18.5"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Verify Xcode and simulators
+        run: |
+          xcodebuild -version
+          swift --version
+          xcrun simctl list devices available | grep "iPhone 16"
+
+      - name: Install build tools
+        run: brew install xcodegen xcbeautify
+
+      - name: Generate Xcode project
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: xcodegen generate
+
+      - name: Cache SPM dependencies
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5
+        with:
+          path: ${{ runner.temp }}/spm-cache
+          key: spm-${{ runner.os }}-${{ hashFiles('ios/HealthPush/project.yml') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Resolve Swift Package dependencies
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project HealthPush.xcodeproj \
+            -scheme "$SCHEME" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm-cache"
+
+      - name: Build for iOS Simulator (Release)
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project HealthPush.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination "$BUILD_DESTINATION" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm-cache" \
+            -skipPackagePluginValidation \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | xcbeautify --renderer github-actions
+
+      - name: Run unit tests
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project HealthPush.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination "$TEST_DESTINATION" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm-cache" \
+            -skipPackagePluginValidation \
+            -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | xcbeautify --renderer github-actions
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        with:
+          name: test-results
+          path: ${{ runner.temp }}/TestResults.xcresult
+          retention-days: 14
+          if-no-files-found: ignore

@@ -1,0 +1,13 @@
+git_url(ENV["MATCH_GIT_URL"] || "https://github.com/your-org/healthpush-certs.git")
+
+storage_mode("git")
+
+type("appstore")
+
+app_identifier(["com.healthpush.app"])
+
+# Optional: specify the branch for certificates repository
+# git_branch("main")
+
+# For CI: set MATCH_PASSWORD environment variable for encryption passphrase
+# For local: Fastlane match will prompt for the passphrase on first run

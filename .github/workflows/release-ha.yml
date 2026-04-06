@@ -1,0 +1,74 @@
+name: Release Home Assistant Integration
+
+on:
+  push:
+    tags:
+      - "ha-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      TAG_NAME: ${{ github.ref_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${TAG_NAME#ha-v}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate integration files exist
+        run: |
+          if [ ! -d "integrations/homeassistant/custom_components/healthpush" ]; then
+            echo "Error: custom_components/healthpush directory not found"
+            exit 1
+          fi
+
+      - name: Package integration
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cd integrations/homeassistant
+          zip -r "$RUNNER_TEMP/healthpush-ha-${VERSION}.zip" \
+            custom_components/healthpush/ \
+            -x "*__pycache__*" "*.pyc"
+
+      - name: Generate release notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cat <<EOF > "$RUNNER_TEMP/release-notes.md"
+          ## HealthPush Home Assistant Integration v${VERSION}
+
+          ### Installation via HACS (recommended)
+          1. Open HACS in Home Assistant
+          2. Add this repository as a custom repository
+          3. Search for "HealthPush" and install
+
+          ### Manual Installation
+          1. Download the \`healthpush-ha-${VERSION}.zip\` asset below
+          2. Extract the \`custom_components/healthpush\` folder
+          3. Copy it to your Home Assistant \`custom_components/\` directory
+          4. Restart Home Assistant
+          EOF
+
+      - name: Create GitHub Release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
+        with:
+          name: "Home Assistant Integration v${{ steps.version.outputs.version }}"
+          body_path: ${{ runner.temp }}/release-notes.md
+          files: ${{ runner.temp }}/healthpush-ha-${{ steps.version.outputs.version }}.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          append_body: true

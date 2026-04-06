@@ -1,0 +1,198 @@
+import Foundation
+import Observation
+import SwiftUI
+
+// MARK: - AppState
+
+/// Observable application state shared across the entire view hierarchy.
+///
+/// This class tracks the current sync status, last sync time, error state,
+/// and user preferences. It is annotated `@MainActor` to ensure all mutations
+/// happen on the main thread for safe SwiftUI binding.
+@MainActor
+@Observable
+final class AppState {
+
+    // MARK: Sync Status
+
+    /// Whether a sync is currently in progress.
+    var isSyncing: Bool = false
+
+    /// Per-destination sync progress (0.0 to 1.0). Keyed by destination name.
+    var syncProgress: [String: Double] = [:]
+
+    /// Status text per destination during sync.
+    var syncStatusText: [String: String] = [:]
+
+    /// The result of the most recent sync, if any.
+    var lastSyncResult: SyncResult?
+
+    /// Human-readable error from the last failed operation.
+    var lastError: String?
+
+    /// Whether an error alert should be shown.
+    var showingError: Bool = false
+
+    // MARK: Timestamps
+
+    /// When the last successful sync completed. Stored property so `@Observable` tracks changes.
+    var lastSyncTime: Date?
+
+    /// The next scheduled sync time, based on the actual BGTaskScheduler earliest begin date.
+    var nextSyncTime: Date? {
+        let interval = UserDefaults.standard.double(forKey: "next_scheduled_sync_time")
+        return interval > 0 ? Date(timeIntervalSince1970: interval) : nil
+    }
+
+    /// Whether the scheduled sync is significantly overdue (30+ minutes past expected time).
+    /// Not overdue if a sync succeeded recently (within the last frequency interval).
+    var isSyncOverdue: Bool {
+        guard let next = nextSyncTime else { return false }
+        // If we synced recently, we're not overdue regardless of the scheduled time
+        if let lastSync = lastSyncTime,
+           Date.now.timeIntervalSince(lastSync) < syncFrequency.timeInterval * 1.5 {
+            return false
+        }
+        return Date.now > next.addingTimeInterval(30 * 60)
+    }
+
+    // MARK: User Preferences
+
+    /// The configured sync frequency.
+    var syncFrequency: SyncFrequency {
+        get {
+            let raw = UserDefaults.standard.string(forKey: "scheduled_sync_frequency")
+                ?? UserDefaults.standard.string(forKey: "sync_frequency")
+                ?? SyncFrequency.oneHour.rawValue
+            return SyncFrequency(rawValue: raw) ?? .oneHour
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: "scheduled_sync_frequency")
+        }
+    }
+
+    /// Whether to sync automatically when the app is opened.
+    var syncOnAppOpen: Bool {
+        get { UserDefaults.standard.bool(forKey: "sync_on_app_open") }
+        set { UserDefaults.standard.set(newValue, forKey: "sync_on_app_open") }
+    }
+
+    /// How many days of sync history to retain.
+    var dataRetentionDays: Int {
+        get {
+            let value = UserDefaults.standard.integer(forKey: "data_retention_days")
+            return value > 0 ? value : 30
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "data_retention_days")
+        }
+    }
+
+    /// Number of data points synced today. Persisted to UserDefaults with date tracking.
+    var dataPointsSyncedToday: Int {
+        get {
+            let storedDate = UserDefaults.standard.string(forKey: "data_points_synced_date") ?? ""
+            let today = Self.todayString
+            if storedDate != today {
+                return 0
+            }
+            return UserDefaults.standard.integer(forKey: "data_points_synced_today")
+        }
+        set {
+            UserDefaults.standard.set(Self.todayString, forKey: "data_points_synced_date")
+            UserDefaults.standard.set(newValue, forKey: "data_points_synced_today")
+        }
+    }
+
+    private static var todayString: String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
+    }
+
+    /// Total number of syncs completed.
+    var totalSyncsCompleted: Int {
+        get { UserDefaults.standard.integer(forKey: "total_syncs_completed") }
+        set { UserDefaults.standard.set(newValue, forKey: "total_syncs_completed") }
+    }
+
+    // MARK: HealthKit
+
+    /// Whether a HealthKit authorization request completed without an API error.
+    var healthKitAuthorized: Bool {
+        get { UserDefaults.standard.bool(forKey: "healthkit_authorized") }
+        set { UserDefaults.standard.set(newValue, forKey: "healthkit_authorized") }
+    }
+
+    /// Whether the welcome flow has already been shown.
+    var hasSeenOnboarding: Bool {
+        get { UserDefaults.standard.bool(forKey: "has_seen_onboarding") }
+        set { UserDefaults.standard.set(newValue, forKey: "has_seen_onboarding") }
+    }
+
+    /// Whether the most recent sync completed with one or more issues.
+    var lastSyncHadIssues: Bool {
+        guard let lastSyncResult else { return false }
+        return lastSyncResult.failedDestinations > 0
+    }
+
+    // MARK: Methods
+
+    /// Records a successful sync result.
+    /// - Parameter result: The sync result to record.
+    func recordSyncResult(_ result: SyncResult) {
+        lastSyncResult = result
+        if result.successfulDestinations > 0 {
+            let now = Date.now
+            UserDefaults.standard.set(now.timeIntervalSince1970, forKey: "last_sync_time")
+            lastSyncTime = now
+            totalSyncsCompleted += 1
+            dataPointsSyncedToday += result.dataPointCount
+        }
+
+        if result.failedDestinations == 0 {
+            lastError = nil
+        } else if !result.errors.isEmpty {
+            let errorMessages = result.errors.map { "\($0.destinationName): \($0.errorDescription)" }
+            lastError = errorMessages.joined(separator: "\n")
+        }
+    }
+
+    /// Sets an error state and optionally shows an alert.
+    /// - Parameters:
+    ///   - message: The error message.
+    ///   - showAlert: Whether to trigger the error alert.
+    func setError(_ message: String, showAlert: Bool = true) {
+        lastError = message
+        showingError = showAlert
+    }
+
+    /// Refreshes stored properties from UserDefaults. Call when the app returns
+    /// to the foreground to pick up changes made by background syncs.
+    func refreshFromUserDefaults() {
+        let interval = UserDefaults.standard.double(forKey: "last_sync_time")
+        lastSyncTime = interval > 0 ? Date(timeIntervalSince1970: interval) : nil
+    }
+
+    /// Clears the current error state.
+    func clearError() {
+        lastError = nil
+        showingError = false
+    }
+
+    /// Returns a formatted string for the last sync time.
+    var lastSyncTimeFormatted: String {
+        guard let lastSyncTime else { return "Never" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: lastSyncTime, relativeTo: .now)
+    }
+
+    /// Returns a formatted string for the next sync time.
+    var nextSyncTimeFormatted: String {
+        guard let nextSyncTime else { return "Not scheduled" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: nextSyncTime, relativeTo: .now)
+    }
+}

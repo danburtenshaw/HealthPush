@@ -1,0 +1,17 @@
+# HealthPush Code Owners
+# These owners will be automatically requested for review on PRs.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+*                                   @healthpush/maintainers
+
+# iOS app
+/ios/                               @healthpush/ios-team
+/fastlane/                          @healthpush/ios-team
+
+# Home Assistant integration
+/integrations/homeassistant/        @healthpush/ha-team
+
+# CI/CD pipelines — require maintainer review for workflow changes
+/.github/workflows/                 @healthpush/maintainers
+/.github/dependabot.yml             @healthpush/maintainers

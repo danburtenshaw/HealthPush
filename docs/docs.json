@@ -1,0 +1,53 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "HealthPush",
+  "description": "Privacy-first Apple Health exports to destinations you control.",
+  "colors": {
+    "primary": "#0F766E",
+    "light": "#14B8A6",
+    "dark": "#115E59"
+  },
+  "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "icon": "github",
+          "href": "https://github.com/danburtenshaw/HealthPush"
+        }
+      ]
+    },
+    "groups": [
+      {
+        "group": "Using HealthPush",
+        "pages": [
+          "index",
+          "quickstart",
+          "privacy-and-open-source",
+          "sync-behavior"
+        ]
+      },
+      {
+        "group": "Destinations",
+        "pages": [
+          "setup-home-assistant",
+          "setup-amazon-s3"
+        ]
+      },
+      {
+        "group": "Build & Contribute",
+        "pages": [
+          "architecture",
+          "adding-a-destination"
+        ]
+      },
+      {
+        "group": "Project",
+        "pages": [
+          "contributing"
+        ]
+      }
+    ]
+  }
+}

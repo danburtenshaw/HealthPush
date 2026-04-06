@@ -1,0 +1,55 @@
+---
+title: Privacy & Open Source
+description: What HealthPush stores, what it sends, and why the app is built this way.
+---
+
+HealthPush is built around a simple rule: your health data should only go where you explicitly tell it to go.
+
+## What HealthPush Does Not Do
+
+- No account creation
+- No HealthPush cloud backend
+- No subscriptions
+- No telemetry
+- No analytics SDKs
+- No crash reporting service
+
+The iOS app also avoids third-party dependencies, which keeps the networking and storage path easier to inspect and audit.
+
+## What Leaves Your Device
+
+Only the health data needed for a configured destination leaves your device.
+
+Examples:
+
+- If you add an Amazon S3 destination, data is uploaded directly to your bucket.
+- If you add a Home Assistant destination, data is posted directly to your Home Assistant webhook URL.
+
+If you do not configure a destination, HealthPush has nowhere to send data.
+
+## What Stays On Your Device
+
+- Destination configuration
+- Sync history
+- App preferences
+- HealthKit authorization state
+
+Secrets such as webhook secrets and S3 credentials are stored in Keychain.
+
+## Open Source Notes
+
+- The app code is public.
+- The Home Assistant integration code is public.
+- The project is MIT licensed.
+- You can inspect the exact sync behavior before deciding whether to trust it.
+
+## Practical Trust Model
+
+HealthPush reduces trust by removing the hosted middle layer. You still need to trust the destination you point it at.
+
+That means:
+
+- A Home Assistant destination is only as private as your Home Assistant deployment.
+- An Amazon S3 destination is only as private as your bucket policy, credentials, and AWS account setup.
+
+HealthPush is responsible for reading Apple Health data locally and delivering it directly. It is not responsible for securing a destination you operate incorrectly.

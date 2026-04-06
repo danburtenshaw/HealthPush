@@ -1,0 +1,69 @@
+---
+title: Set Up Home Assistant
+description: Connect HealthPush to Home Assistant using the included custom integration.
+---
+
+HealthPush sends data to Home Assistant through a webhook exposed by the included custom integration.
+
+This is a direct device-to-destination path. There is no HealthPush relay service involved.
+
+## Before You Start
+
+- Your iPhone must be able to reach your Home Assistant instance.
+- If you use remote access, use a webhook URL that is reachable from the phone.
+- You only need a webhook secret if you want extra request validation.
+
+## Install The Home Assistant Integration
+
+### HACS
+
+1. Open HACS in Home Assistant.
+2. Go to `Integrations`.
+3. Add `https://github.com/danburtenshaw/HealthPush` as a custom repository.
+4. Choose the `Integration` category.
+5. Search for `HealthPush` and install it.
+6. Restart Home Assistant.
+
+### Manual install
+
+Copy [`integrations/homeassistant/custom_components/healthpush`](/Volumes/T7/git/personal/HealthPush/integrations/homeassistant/custom_components/healthpush) into your Home Assistant `custom_components` directory, then restart Home Assistant.
+
+## Create The Integration In Home Assistant
+
+1. Open `Settings > Devices & Services`.
+2. Click `Add Integration`.
+3. Search for `HealthPush`.
+4. Enter a friendly device name.
+5. Optionally enter a webhook secret.
+6. Copy the webhook URL shown by Home Assistant.
+
+## Add The Destination In HealthPush
+
+1. Open `Destinations`.
+2. Add `Home Assistant`.
+3. Enter a name.
+4. Paste the webhook URL.
+5. If you configured a webhook secret in Home Assistant, enter the same secret here.
+6. Choose the sync frequency.
+7. Choose the health metrics you want to send.
+8. Tap `Test Connection`.
+9. Save the destination.
+
+## What Gets Sent
+
+HealthPush posts health data to the Home Assistant webhook URL. The integration turns that into sensor entities such as:
+
+- `sensor.healthpush_steps`
+- `sensor.healthpush_heart_rate`
+- `sensor.healthpush_weight`
+
+Daily total metrics like steps are sent as today-style totals rather than raw incremental deltas.
+
+## Troubleshooting
+
+- If `Test Connection` fails, make sure the webhook URL is reachable from the phone.
+- If Home Assistant rejects requests, re-check the webhook secret on both sides.
+- If entities exist but stay `unknown`, run a manual sync once from the app.
+- If updates stop in the background, check whether the app was force-quit or whether iOS is delaying background work.
+
+For Home Assistant-specific implementation details, see [`integrations/homeassistant/README.md`](/Volumes/T7/git/personal/HealthPush/integrations/homeassistant/README.md).

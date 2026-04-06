@@ -1,0 +1,181 @@
+import Testing
+import Foundation
+@testable import HealthPushStorageCore
+
+@Suite(
+    "S3SyncServiceIntegration",
+    .serialized,
+    .enabled(
+        if: ProcessInfo.processInfo.environment["MINIO_ENDPOINT"] != nil
+            && ProcessInfo.processInfo.environment["MINIO_BUCKET"] != nil
+            && ProcessInfo.processInfo.environment["MINIO_REGION"] != nil
+            && ProcessInfo.processInfo.environment["MINIO_ACCESS_KEY_ID"] != nil
+            && ProcessInfo.processInfo.environment["MINIO_SECRET_ACCESS_KEY"] != nil,
+        "MinIO integration environment is not configured"
+    )
+)
+struct S3SyncServiceIntegrationTests {
+    @Test("MinIO connection test succeeds")
+    func testConnectionAgainstMinIO() async throws {
+        let integration = minioIntegration()
+        let service = makeService(integration: integration, pathPrefix: uniquePrefix("connection"))
+
+        #expect(try await service.testConnection())
+    }
+
+    @Test("JSON sync uploads and merges objects in MinIO")
+    func jsonSyncMergesObjects() async throws {
+        let integration = minioIntegration()
+        let prefix = uniquePrefix("json")
+        let service = makeService(integration: integration, pathPrefix: prefix, exportFormat: .json)
+
+        let firstID = UUID()
+        let secondID = UUID()
+
+        let firstBatch = [
+            makePoint(id: firstID, value: 72),
+            makePoint(id: secondID, value: 75, minutesAfterStart: 5)
+        ]
+        let secondBatch = [
+            makePoint(id: secondID, value: 76, minutesAfterStart: 5),
+            makePoint(id: UUID(), value: 78, minutesAfterStart: 10)
+        ]
+
+        let firstStats = try await service.sync(data: firstBatch)
+        let secondStats = try await service.sync(data: secondBatch)
+
+        #expect(firstStats.newCount == 2)
+        #expect(secondStats.newCount == 2)
+
+        let storedPoints = try await fetchStoredPoints(
+            integration: integration,
+            prefix: prefix,
+            metricType: .heartRate,
+            format: .json
+        )
+
+        #expect(storedPoints.count == 3)
+        #expect(storedPoints.contains { $0.id == firstID && $0.value == 72 })
+        #expect(storedPoints.contains { $0.id == secondID && $0.value == 76 })
+        #expect(storedPoints.contains { $0.value == 78 })
+    }
+
+    @Test("CSV sync writes readable data to MinIO")
+    func csvSyncWritesReadableObjects() async throws {
+        let integration = minioIntegration()
+        let prefix = uniquePrefix("csv")
+        let service = makeService(integration: integration, pathPrefix: prefix, exportFormat: .csv)
+
+        let data = [
+            makePoint(id: UUID(), metricType: .steps, value: 4_321),
+            makePoint(id: UUID(), metricType: .steps, value: 5_678, minutesAfterStart: 30)
+        ]
+
+        let stats = try await service.sync(data: data)
+        #expect(stats.newCount == 2)
+
+        let storedPoints = try await fetchStoredPoints(
+            integration: integration,
+            prefix: prefix,
+            metricType: .steps,
+            format: .csv
+        )
+
+        #expect(storedPoints.count == 2)
+        #expect(storedPoints.map(\.value).sorted() == [4_321, 5_678])
+    }
+
+    private func makeService(
+        integration: MinIOIntegration,
+        pathPrefix: String,
+        exportFormat: ExportFormat = .json
+    ) -> S3SyncService {
+        let client = S3Client(
+            bucket: integration.bucket,
+            region: integration.region,
+            accessKeyID: integration.accessKeyID,
+            secretAccessKey: integration.secretAccessKey,
+            endpointOverride: integration.endpoint
+        )
+
+        return S3SyncService(
+            s3Client: client,
+            pathPrefix: pathPrefix,
+            exportFormat: exportFormat
+        )
+    }
+
+    private func fetchStoredPoints(
+        integration: MinIOIntegration,
+        prefix: String,
+        metricType: HealthMetricType,
+        format: ExportFormat
+    ) async throws -> [HealthDataPoint] {
+        let client = S3Client(
+            bucket: integration.bucket,
+            region: integration.region,
+            accessKeyID: integration.accessKeyID,
+            secretAccessKey: integration.secretAccessKey,
+            endpointOverride: integration.endpoint
+        )
+
+        let exporter = HealthDataExporter()
+        let dateKey = try #require(exporter.groupByDateAndMetric([makePoint(metricType: metricType, value: 1)]).keys.first)
+        let key = HealthDataExporter.buildKey(
+            prefix: prefix,
+            dateString: dateKey.dateString,
+            metricType: metricType,
+            ext: format.rawValue
+        )
+
+        let storedData = try #require(try await client.getObject(key: key))
+        switch format {
+        case .json:
+            return exporter.decodeJSON(storedData)
+        case .csv:
+            return exporter.decodeCSV(storedData)
+        }
+    }
+
+    private func makePoint(
+        id: UUID = UUID(),
+        metricType: HealthMetricType = .heartRate,
+        value: Double,
+        minutesAfterStart: Double = 0
+    ) -> HealthDataPoint {
+        let start = Date(timeIntervalSince1970: 1_710_000_000 + (minutesAfterStart * 60))
+        return HealthDataPoint(
+            id: id,
+            metricType: metricType,
+            value: value,
+            unit: metricType.unitString,
+            timestamp: start,
+            endTimestamp: start.addingTimeInterval(60),
+            sourceName: "Integration Test"
+        )
+    }
+
+    private func uniquePrefix(_ name: String) -> String {
+        "integration-tests/\(name)/\(UUID().uuidString.lowercased())"
+    }
+
+    private func minioIntegration() -> MinIOIntegration {
+        let env = ProcessInfo.processInfo.environment
+
+        return MinIOIntegration(
+            endpoint: env["MINIO_ENDPOINT"]!,
+            bucket: env["MINIO_BUCKET"]!,
+            region: env["MINIO_REGION"]!,
+            accessKeyID: env["MINIO_ACCESS_KEY_ID"]!,
+            secretAccessKey: env["MINIO_SECRET_ACCESS_KEY"]!
+        )
+    }
+}
+
+private struct MinIOIntegration {
+    let endpoint: String
+    let bucket: String
+    let region: String
+    let accessKeyID: String
+    let secretAccessKey: String
+}

@@ -1,0 +1,69 @@
+---
+title: Set Up S3-Compatible Storage
+description: Export Apple Health data directly to your own S3 bucket or compatible endpoint.
+---
+
+S3-compatible storage is the most direct file-based destination in the current app.
+
+HealthPush uploads straight from your iPhone to your bucket. There is no HealthPush storage layer in between.
+
+## Before You Start
+
+You need:
+
+- A bucket you control
+- A signing region
+- An access key ID
+- The matching secret access key
+- Optionally, a custom endpoint for MinIO or another S3-compatible service
+
+## Add The Destination In HealthPush
+
+1. Open `Destinations`.
+2. Add `S3-Compatible Storage`.
+3. Enter a display name.
+4. Enter the bucket name.
+5. Leave the endpoint blank for AWS S3, or enter a custom endpoint such as `https://s3.example.com` or `http://192.168.1.10:9000`.
+6. Choose or enter the signing region.
+7. Enter the access key ID and secret key.
+8. Optionally set a path prefix such as `health/data`.
+9. Choose `JSON` or `CSV`.
+10. Choose how often this destination should sync.
+11. Choose how far back the first full sync should start.
+12. Choose the health metrics you want to export.
+13. Tap `Test Connection`.
+14. Save the destination.
+
+## Sync Window Behavior
+
+S3 has two phases:
+
+- First sync: HealthPush can backfill from the start date you choose.
+- Later syncs: HealthPush re-checks the last 3 days to catch delayed HealthKit data and merge it safely.
+
+Changing the start date triggers another full sync for that destination.
+
+## File Layout
+
+The app stores files under the path prefix you choose, or at the bucket root if you leave it blank.
+
+Example shape:
+
+```text
+health/data/2026-04-03/heart_rate.json
+health/data/2026-04-03/steps.json
+```
+
+If you select CSV export, the file extension changes accordingly.
+
+## Security Notes
+
+- Credentials are stored on-device in Keychain.
+- HealthPush does not proxy or retain your exported files.
+- Bucket permissions are your responsibility. Use the narrowest permissions that still allow read and upload.
+
+## Troubleshooting
+
+- If the test fails, confirm bucket name, region, credentials, and custom endpoint if you entered one.
+- If sync succeeds but files are not where you expect, check the configured path prefix.
+- If you expected near-real-time uploads, review [How Sync Really Works](/sync-behavior) because iOS may delay unattended runs.

@@ -1,0 +1,78 @@
+---
+title: How Sync Really Works
+description: What HealthPush can do in the background, and what iOS still controls.
+---
+
+This page is the practical answer to “how often will my data actually sync?”
+
+The short version: HealthPush supports background sync, but iOS does not let any app promise an exact unattended schedule.
+
+## The Three Ways Sync Happens
+
+### 1. Manual sync
+
+When you tap `Sync Now`, HealthPush runs immediately in the foreground.
+
+### 2. HealthKit-triggered background delivery
+
+HealthPush registers for HealthKit observer updates on the metrics enabled across your destinations.
+
+When new health data arrives, iOS can wake the app and let it sync. This is often the best path for timely updates from Apple Watch and other HealthKit sources.
+
+### 3. Scheduled background refresh
+
+HealthPush also schedules background refresh and processing tasks. The frequency you choose is used as the earliest eligible time for the next run.
+
+iOS still decides the real execution time.
+
+## What Your Chosen Frequency Means
+
+The frequency you set in a destination is a minimum interval, not a guarantee.
+
+Examples:
+
+- `Every 15 Minutes` means “do not run this destination more often than every 15 minutes.”
+- It does not mean HealthPush will run exactly every 15 minutes all day.
+- If you have multiple destinations, HealthPush schedules background work using the most frequent enabled destination, then skips destinations that are not yet due.
+
+## Why iOS May Delay Sync
+
+iOS can defer background work because of:
+
+- Battery conditions
+- Low Power Mode
+- Network availability
+- Device usage patterns
+- The app being force-quit
+- The device being locked while Health data remains protected
+
+This is normal platform behavior, not a HealthPush-specific bug.
+
+## Important Limits
+
+- Force-quitting the app disables background sync until you open the app again.
+- Background timing is approximate even when everything is configured correctly.
+- The app may sync quickly after new HealthKit data arrives, but that still depends on iOS delivering the event.
+- If reliable near-real-time delivery is critical, plan around occasional delays.
+
+## Destination-Specific Behavior
+
+### Home Assistant
+
+- The first sync pulls recent data rather than your full history.
+- Later syncs usually send only what changed since the last sync.
+- Daily totals like steps are queried from the start of the current day so Home Assistant can show “today” values cleanly.
+
+### Amazon S3
+
+- The first sync can backfill from a configurable start date.
+- Later syncs re-check the last 3 days to catch delayed Apple Watch and HealthKit data safely.
+- S3 export is designed to make that re-check idempotent.
+
+## Best Practices
+
+- Run one manual sync after setup.
+- Do not force-quit the app.
+- Leave Low Power Mode off if you want better background execution chances.
+- Check that your destination receives data before relying on unattended sync.
+- Use the app’s sync history if behavior seems inconsistent.

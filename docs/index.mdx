@@ -1,0 +1,37 @@
+---
+title: HealthPush
+description: Privacy-first Apple Health exports to destinations you control.
+sidebarTitle: Overview
+mode: wide
+---
+
+HealthPush is an open-source iPhone app that reads Apple Health data and pushes it directly to destinations you control.
+
+There is no HealthPush cloud, no HealthPush account, and no telemetry pipeline. The app currently supports Home Assistant and S3-compatible storage, with a shared destination model designed to support more targets over time.
+
+## What Users Should Know First
+
+- Health data leaves your device only when you configure and enable a destination.
+- Background sync is best-effort on iOS. You choose a minimum interval, but iOS decides the exact wake-up time.
+- The app can also sync when HealthKit reports new data, which helps for Apple Watch and other live updates.
+- Force-quitting the app disables background sync until you open it again.
+- All code is open source, and the iOS app avoids third-party dependencies.
+
+## Start Here
+
+- [Quickstart](/quickstart) explains how to run the app and complete first-time setup.
+- [Privacy & Open Source](/privacy-and-open-source) explains exactly what HealthPush stores, sends, and does not do.
+- [How Sync Really Works](/sync-behavior) explains the practical limits of iOS background execution.
+- [Set Up Home Assistant](/setup-home-assistant) walks through the webhook-based integration.
+- [Set Up S3-Compatible Storage](/setup-amazon-s3) walks through direct bucket export.
+
+## Current Destinations
+
+- S3-compatible storage
+- Home Assistant
+
+## Why It Exists
+
+- Apple Health data is valuable, sensitive, and often trapped inside vendor-specific apps.
+- HealthPush is built to move that data into systems you own without asking you to trust another hosted service.
+- The product direction is multi-destination by design, not a single-purpose Home Assistant client with extras bolted on later.

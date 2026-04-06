@@ -1,0 +1,130 @@
+default_platform(:ios)
+
+platform :ios do
+  # ------------------------------------------------------------------
+  # Shared helpers
+  # ------------------------------------------------------------------
+
+  before_all do
+    setup_ci if ENV["CI"]
+  end
+
+  desc "Configure App Store Connect API key from environment"
+  private_lane :configure_api_key do
+    app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+      key_content: ENV["APP_STORE_CONNECT_API_KEY_CONTENT"],
+      is_key_content_base64: true,
+      in_house: false
+    )
+  end
+
+  desc "Sync signing certificates and provisioning profiles via match"
+  private_lane :sync_signing do |options|
+    type = options[:type] || "appstore"
+
+    match(
+      type: type,
+      app_identifier: "com.healthpush.app",
+      readonly: is_ci
+    )
+  end
+
+  desc "Increment build number to current timestamp (ensures uniqueness)"
+  private_lane :bump_build_number do
+    increment_build_number(
+      build_number: Time.now.strftime("%Y%m%d%H%M"),
+      xcodeproj: "HealthPush.xcodeproj"
+    )
+  end
+
+  # ------------------------------------------------------------------
+  # Public lanes
+  # ------------------------------------------------------------------
+
+  desc "Run unit tests"
+  lane :test do
+    run_tests(
+      project: "HealthPush.xcodeproj",
+      scheme: "HealthPush",
+      device: "iPhone 16",
+      clean: true,
+      code_coverage: true,
+      output_types: "junit,html",
+      output_directory: "fastlane/test_output"
+    )
+  end
+
+  desc "Build and upload to TestFlight"
+  lane :beta do |options|
+    configure_api_key
+    sync_signing(type: "appstore")
+    bump_build_number
+
+    if options[:version]
+      increment_version_number(
+        version_number: options[:version],
+        xcodeproj: "HealthPush.xcodeproj"
+      )
+    end
+
+    build_app(
+      project: "HealthPush.xcodeproj",
+      scheme: "HealthPush",
+      configuration: "Release",
+      export_method: "app-store",
+      clean: true,
+      include_symbols: true,
+      include_bitcode: false
+    )
+
+    changelog = options[:whats_new] || changelog_from_git_commits(
+      commits_count: 10,
+      pretty: "- %s"
+    )
+
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      changelog: changelog
+    )
+  end
+
+  desc "Build and upload to App Store for review"
+  lane :release do |options|
+    configure_api_key
+    sync_signing(type: "appstore")
+    bump_build_number
+
+    if options[:version]
+      increment_version_number(
+        version_number: options[:version],
+        xcodeproj: "HealthPush.xcodeproj"
+      )
+    end
+
+    build_app(
+      project: "HealthPush.xcodeproj",
+      scheme: "HealthPush",
+      configuration: "Release",
+      export_method: "app-store",
+      clean: true,
+      include_symbols: true,
+      include_bitcode: false
+    )
+
+    whats_new = options[:whats_new] || "Bug fixes and performance improvements."
+
+    upload_to_app_store(
+      submit_for_review: false,
+      automatic_release: false,
+      force: true,
+      skip_screenshots: true,
+      skip_metadata: false,
+      release_notes: {
+        "en-US" => whats_new
+      },
+      precheck_include_in_app_purchases: false
+    )
+  end
+end

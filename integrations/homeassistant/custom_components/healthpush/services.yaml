@@ -1,0 +1,2 @@
+# HealthPush does not currently expose any services.
+# Data is received passively via webhook from the iOS app.

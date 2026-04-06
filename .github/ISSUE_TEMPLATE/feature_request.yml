@@ -1,0 +1,91 @@
+name: Feature Request
+description: Suggest a new feature or improvement for HealthPush
+title: "[Feature]: "
+labels: ["enhancement"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature! Please describe the problem you want to solve and how you envision the solution. We read every request.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of HealthPush would this feature affect?
+      options:
+        - iOS App
+        - Home Assistant Integration
+        - New Destination
+        - Documentation
+        - CI / Tooling
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Description
+      description: |
+        What problem does this feature solve? Describe the pain point or use case.
+        Example: "I want to export my health data to a spreadsheet so I can create custom charts."
+      placeholder: Describe the problem or use case.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: |
+        How do you envision this working? Be as specific or as general as you like.
+      placeholder: Describe your proposed solution.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: destination-type
+    attributes:
+      label: Destination Type (if applicable)
+      description: If this is a request for a new sync destination, which type?
+      options:
+        - Not a destination request
+        - CSV Export
+        - PDF Report
+        - Google Sheets
+        - MQTT
+        - InfluxDB
+        - Webhook (generic)
+        - Other (describe in the solution above)
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: Describe any alternatives you have considered.
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, mockups, or references that help explain the feature.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues and this feature has not been requested before.
+          required: true
+        - label: I would be willing to contribute this feature via a pull request.
+          required: false
