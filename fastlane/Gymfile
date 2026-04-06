@@ -1,0 +1,16 @@
+scheme("HealthPush")
+project("HealthPush.xcodeproj")
+
+configuration("Release")
+clean(true)
+
+export_method("app-store")
+
+include_symbols(true)
+include_bitcode(false)
+
+output_directory("./build")
+output_name("HealthPush")
+
+# Suppress xcodebuild output noise in CI
+suppress_xcode_output(true)

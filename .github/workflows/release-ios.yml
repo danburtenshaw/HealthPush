@@ -1,0 +1,99 @@
+name: Release iOS App
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version number (e.g. 1.2.0)"
+        required: true
+        type: string
+      whats_new:
+        description: "What's new in this release (App Store release notes)"
+        required: true
+        type: string
+      track:
+        description: "Release track"
+        required: true
+        type: choice
+        options:
+          - testflight
+          - appstore
+        default: testflight
+
+jobs:
+  release:
+    name: Build & Upload to App Store Connect
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
+      PROJECT_DIR: ios/HealthPush
+      FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: 120
+      # Pass workflow_dispatch inputs through environment variables to avoid
+      # command injection (even though only write-access users can trigger).
+      INPUT_VERSION: ${{ inputs.version }}
+      INPUT_WHATS_NEW: ${{ inputs.whats_new }}
+      INPUT_TRACK: ${{ inputs.track }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode version
+        run: |
+          sudo xcode-select -s "$DEVELOPER_DIR"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: xcodegen generate
+
+      - name: Install Fastlane
+        run: gem install fastlane
+
+      - name: Configure App Store Connect API key
+        env:
+          ASC_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$ASC_KEY_CONTENT" > ~/private_keys/AuthKey_"$ASC_KEY_ID".p8
+
+      - name: Set version number in project
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          # Validate version format (digits and dots only)
+          if ! echo "$INPUT_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Error: Version must be in format X.Y.Z (e.g. 1.2.0)"
+            exit 1
+          fi
+          sed -i '' "s/MARKETING_VERSION: .*/MARKETING_VERSION: \"$INPUT_VERSION\"/" project.yml
+          xcodegen generate
+
+      - name: Run Fastlane
+        working-directory: ${{ env.PROJECT_DIR }}
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+        run: |
+          if [ "$INPUT_TRACK" = "appstore" ]; then
+            fastlane release version:"$INPUT_VERSION" whats_new:"$INPUT_WHATS_NEW"
+          else
+            fastlane beta version:"$INPUT_VERSION" whats_new:"$INPUT_WHATS_NEW"
+          fi
+
+      - name: Create GitHub Release tag
+        if: inputs.track == 'appstore'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git tag "ios-v${INPUT_VERSION}"
+          git push origin "ios-v${INPUT_VERSION}"

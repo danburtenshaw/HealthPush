@@ -1,0 +1,56 @@
+name: Home Assistant Integration CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "integrations/homeassistant/**"
+      - ".github/workflows/ha-integration-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "integrations/homeassistant/**"
+      - ".github/workflows/ha-integration-ci.yml"
+
+concurrency:
+  group: ha-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: integrations/homeassistant
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install linting tools
+        run: pip install ruff
+
+      - name: Run ruff linter
+        run: ruff check custom_components/
+
+      - name: Check formatting with ruff
+        run: ruff format --check custom_components/
+
+      - name: Install test dependencies
+        run: |
+          if [ -f requirements_test.txt ]; then
+            pip install -r requirements_test.txt
+          elif [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          fi
+
+      - name: Run pytest
+        run: python -m pytest tests/ -v --tb=short

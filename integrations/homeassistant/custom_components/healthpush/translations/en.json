@@ -1,0 +1,25 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up HealthPush",
+        "description": "Configure the HealthPush integration to receive health data from your iOS device.",
+        "data": {
+          "name": "Device name",
+          "webhook_secret": "Webhook secret (optional)"
+        },
+        "data_description": {
+          "name": "A friendly name for this HealthPush instance (e.g. \"My iPhone\").",
+          "webhook_secret": "An optional shared secret the iOS app will send to authenticate requests. Leave blank to disable authentication."
+        }
+      },
+      "webhook_info": {
+        "title": "Webhook URL",
+        "description": "Configure the HealthPush iOS app with this webhook URL:\n\n`{webhook_url}`\n\nThe integration is now ready to receive health data."
+      }
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  }
+}
