@@ -36,11 +36,17 @@ struct DestinationsScreen: View {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
                     }
+                    .accessibilityLabel("Add Destination")
+                    .accessibilityHint("Choose a destination type to add")
                 }
             }
-            .confirmationDialog("Add Destination", isPresented: $showingDestinationPicker) {
-                Button(DestinationType.s3.displayName) { showingAddS3Sheet = true }
-                Button("Home Assistant") { showingAddSheet = true }
+            .sheet(isPresented: $showingDestinationPicker) {
+                AddDestinationSheet { type in
+                    switch type {
+                    case .s3: showingAddS3Sheet = true
+                    case .homeAssistant: showingAddSheet = true
+                    }
+                }
             }
             .sheet(isPresented: $showingAddSheet) {
                 destinationManager.loadDestinations(modelContext: modelContext)
@@ -68,21 +74,17 @@ struct DestinationsScreen: View {
         ContentUnavailableView {
             Label("No Destinations", systemImage: "arrow.triangle.branch")
         } description: {
-            Text("Add a destination to start syncing your Apple Health data. S3-compatible storage is the recommended first setup for direct export.")
+            Text("Add a destination to start syncing your Apple Health data.")
         } actions: {
             Button {
-                showingAddS3Sheet = true
+                showingDestinationPicker = true
             } label: {
-                Text("Add S3 Storage")
+                Text("Add Destination")
                     .font(.headline)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
                     .background(Color.accentColor, in: Capsule())
                     .foregroundStyle(.white)
-            }
-
-            Button("Choose Another Destination") {
-                showingDestinationPicker = true
             }
         }
     }
@@ -97,6 +99,7 @@ struct DestinationsScreen: View {
                         DestinationCard(config: config)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityHint("Double tap to edit, long press for more options")
                     .contextMenu {
                         Button {
                             selectedConfig = config

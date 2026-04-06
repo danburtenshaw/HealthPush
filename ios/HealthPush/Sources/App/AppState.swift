@@ -1,6 +1,9 @@
 import Foundation
 import Observation
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - AppState
 
@@ -71,12 +74,6 @@ final class AppState {
         }
     }
 
-    /// Whether to sync automatically when the app is opened.
-    var syncOnAppOpen: Bool {
-        get { UserDefaults.standard.bool(forKey: "sync_on_app_open") }
-        set { UserDefaults.standard.set(newValue, forKey: "sync_on_app_open") }
-    }
-
     /// How many days of sync history to retain.
     var dataRetentionDays: Int {
         get {
@@ -116,6 +113,14 @@ final class AppState {
         set { UserDefaults.standard.set(newValue, forKey: "total_syncs_completed") }
     }
 
+    /// Whether any sync has ever delivered data points. Once true, stays true.
+    /// Used to distinguish initial-setup "no data" (likely a permissions issue)
+    /// from routine periodic syncs that legitimately find nothing new.
+    var hasEverSyncedData: Bool {
+        get { UserDefaults.standard.bool(forKey: "has_ever_synced_data") }
+        set { UserDefaults.standard.set(newValue, forKey: "has_ever_synced_data") }
+    }
+
     // MARK: HealthKit
 
     /// Whether a HealthKit authorization request completed without an API error.
@@ -125,15 +130,37 @@ final class AppState {
     }
 
     /// Whether the welcome flow has already been shown.
-    var hasSeenOnboarding: Bool {
-        get { UserDefaults.standard.bool(forKey: "has_seen_onboarding") }
-        set { UserDefaults.standard.set(newValue, forKey: "has_seen_onboarding") }
+    /// Backed by a stored property so `@Observable` tracks mutations and SwiftUI reacts.
+    var hasSeenOnboarding: Bool = UserDefaults.standard.bool(forKey: "has_seen_onboarding") {
+        didSet { UserDefaults.standard.set(hasSeenOnboarding, forKey: "has_seen_onboarding") }
     }
 
     /// Whether the most recent sync completed with one or more issues.
     var lastSyncHadIssues: Bool {
         guard let lastSyncResult else { return false }
         return lastSyncResult.failedDestinations > 0
+    }
+
+    /// Whether the last completed sync produced zero data points and the user has
+    /// never successfully synced data before. This indicates a likely permissions
+    /// issue during initial setup. Once any sync has delivered data, periodic syncs
+    /// that find nothing new are expected and do not trigger this warning.
+    var lastSyncHadNoData: Bool {
+        guard let lastSyncResult else { return false }
+        guard !hasEverSyncedData else { return false }
+        return lastSyncResult.dataPointCount == 0
+            && lastSyncResult.failedDestinations == 0
+            && lastSyncResult.successfulDestinations > 0
+    }
+
+    /// Whether Background App Refresh is available for this app.
+    /// Returns `false` when the user has disabled it in system Settings or Low Power Mode is active.
+    var isBackgroundRefreshAvailable: Bool {
+        #if canImport(UIKit)
+        return UIApplication.shared.backgroundRefreshStatus == .available
+        #else
+        return true
+        #endif
     }
 
     // MARK: Methods
@@ -148,6 +175,9 @@ final class AppState {
             lastSyncTime = now
             totalSyncsCompleted += 1
             dataPointsSyncedToday += result.dataPointCount
+            if result.dataPointCount > 0 {
+                hasEverSyncedData = true
+            }
         }
 
         if result.failedDestinations == 0 {
@@ -172,6 +202,7 @@ final class AppState {
     func refreshFromUserDefaults() {
         let interval = UserDefaults.standard.double(forKey: "last_sync_time")
         lastSyncTime = interval > 0 ? Date(timeIntervalSince1970: interval) : nil
+        hasSeenOnboarding = UserDefaults.standard.bool(forKey: "has_seen_onboarding")
     }
 
     /// Clears the current error state.

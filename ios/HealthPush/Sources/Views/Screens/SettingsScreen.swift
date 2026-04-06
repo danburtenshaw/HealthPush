@@ -1,5 +1,8 @@
 import SwiftUI
 import SwiftData
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - SettingsScreen
 
@@ -20,7 +23,6 @@ struct SettingsScreen: View {
     var body: some View {
         NavigationStack {
             Form {
-                syncSection
                 backgroundSyncSection
                 healthKitSection
                 onboardingSection
@@ -41,18 +43,6 @@ struct SettingsScreen: View {
     }
 
     // MARK: Sections
-
-    private var syncSection: some View {
-        Section {
-            Toggle(isOn: syncOnAppOpenBinding) {
-                Label("Sync on App Open", systemImage: "arrow.triangle.2.circlepath")
-            }
-        } header: {
-            Text("Sync")
-        } footer: {
-            Text("Sync frequency is configured per destination. Background sync timing is approximate — iOS may delay tasks based on system conditions.")
-        }
-    }
 
     private var backgroundSyncSection: some View {
         Section {
@@ -77,6 +67,26 @@ struct SettingsScreen: View {
                     bulletRow(icon: "clock", text: "The sync frequency you set is a minimum interval — iOS controls exact timing")
                 }
             }
+
+            if !appState.isBackgroundRefreshAvailable {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Background App Refresh is Off", systemImage: "exclamationmark.triangle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.orange)
+
+                    Text("Background syncs will not run. Turn on Background App Refresh in Settings, or disable Low Power Mode.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Button("Open Settings") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    }
+                    .font(.caption)
+                    .accessibilityHint("Opens iOS Settings to enable Background App Refresh")
+                }
+            }
         } header: {
             Text("Background Sync")
         }
@@ -90,10 +100,19 @@ struct SettingsScreen: View {
                 Label("Review HealthKit Access", systemImage: "heart.fill")
             }
             .tint(.primary)
+
+            Button {
+                if let url = URL(string: "x-apple-health://") {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
+                Label("Open Health App", systemImage: "heart.text.clipboard")
+            }
+            .tint(.primary)
         } header: {
             Text("HealthKit")
         } footer: {
-            Text("HealthPush needs permission to read your health data. You can manage individual data types in the Health app.")
+            Text("HealthPush needs permission to read your health data. To change which data types are shared, open the Health app and go to Sharing > Apps > HealthPush.")
         }
     }
 
@@ -122,6 +141,7 @@ struct SettingsScreen: View {
                 Label("Reset Sync Data", systemImage: "arrow.counterclockwise")
                     .foregroundStyle(.red)
             }
+            .accessibilityHint("Clears all sync history and forces a full re-sync")
         } header: {
             Text("Data")
         }
@@ -158,9 +178,11 @@ struct SettingsScreen: View {
                     Image(systemName: "arrow.up.right")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                 }
             }
             .tint(.primary)
+            .accessibilityHint("Opens in Safari")
 
             LabeledContent {
                 Text("MIT")
@@ -176,14 +198,6 @@ struct SettingsScreen: View {
     }
 
     // MARK: Bindings
-
-    /// Creates a binding for the sync-on-app-open computed property on AppState.
-    private var syncOnAppOpenBinding: Binding<Bool> {
-        Binding(
-            get: { appState.syncOnAppOpen },
-            set: { appState.syncOnAppOpen = $0 }
-        )
-    }
 
     /// Creates a binding for the data retention computed property on AppState.
     private var dataRetentionBinding: Binding<Int> {
@@ -201,10 +215,12 @@ struct SettingsScreen: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
+                .accessibilityHidden(true)
             Text(text)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Computed Properties
@@ -255,6 +271,7 @@ struct SettingsScreen: View {
         appState.lastSyncTime = nil
         appState.lastSyncResult = nil
         appState.totalSyncsCompleted = 0
+        appState.hasEverSyncedData = false
     }
 }
 

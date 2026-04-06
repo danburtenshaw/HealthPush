@@ -4,7 +4,7 @@ storage_mode("git")
 
 type("appstore")
 
-app_identifier(["com.healthpush.app"])
+app_identifier(["app.healthpush"])
 
 # Optional: specify the branch for certificates repository
 # git_branch("main")

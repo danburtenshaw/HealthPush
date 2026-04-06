@@ -48,6 +48,9 @@ struct SyncHistoryScreen: View {
                               : "line.3.horizontal.decrease.circle.fill"
                         )
                     }
+                    .accessibilityLabel("Filter")
+                    .accessibilityValue(selectedFilter.displayName)
+                    .accessibilityHint("Filter sync history by status")
                 }
             }
         }
@@ -190,6 +193,8 @@ private struct SyncRecordRow: View {
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(recordAccessibilityLabel)
 
             // Error detail (expandable)
             if let errorMessage = record.errorMessage {
@@ -216,12 +221,35 @@ private struct SyncRecordRow: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(isExpanded ? "Error: \(errorMessage)" : "Error details available")
+                .accessibilityHint(isExpanded ? "Double tap to collapse" : "Double tap to expand error details")
             }
         }
         .padding(.vertical, 4)
     }
 
     // MARK: Helpers
+
+    private var recordAccessibilityLabel: String {
+        var parts: [String] = []
+        parts.append(record.destinationName)
+        parts.append(statusAccessibilityDescription)
+        parts.append("\(record.dataPointCount) data points")
+        parts.append("duration \(formattedDuration)")
+        if record.isBackgroundSync {
+            parts.append("background sync")
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    private var statusAccessibilityDescription: String {
+        switch record.status {
+        case .success: return "successful"
+        case .partialFailure: return "partially failed"
+        case .failure: return "failed"
+        case .inProgress: return "in progress"
+        }
+    }
 
     private var statusIcon: some View {
         Image(systemName: iconName)

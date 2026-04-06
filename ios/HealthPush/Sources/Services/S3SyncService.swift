@@ -25,7 +25,7 @@ struct S3SyncService: Sendable {
     private let exportFormat: ExportFormat
 
     #if canImport(os)
-    private let logger = Logger(subsystem: "com.healthpush.app", category: "S3SyncService")
+    private let logger = Logger(subsystem: "app.healthpush", category: "S3SyncService")
     #endif
 
     init(

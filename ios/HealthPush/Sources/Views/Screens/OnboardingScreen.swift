@@ -13,8 +13,9 @@ struct OnboardingScreen: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var requestingHealthAccess = false
-    @State private var showingAddS3 = false
-    @State private var showingAddHomeAssistant = false
+    @State private var showingAddDestination = false
+    @State private var showingSetupS3 = false
+    @State private var showingSetupHomeAssistant = false
 
     var body: some View {
         NavigationStack {
@@ -38,12 +39,20 @@ struct OnboardingScreen: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingAddS3) {
+            .sheet(isPresented: $showingAddDestination) {
+                AddDestinationSheet { type in
+                    switch type {
+                    case .s3: showingSetupS3 = true
+                    case .homeAssistant: showingSetupHomeAssistant = true
+                    }
+                }
+            }
+            .sheet(isPresented: $showingSetupS3) {
                 destinationManager.loadDestinations(modelContext: modelContext)
             } content: {
                 S3SetupScreen(mode: .create)
             }
-            .sheet(isPresented: $showingAddHomeAssistant) {
+            .sheet(isPresented: $showingSetupHomeAssistant) {
                 destinationManager.loadDestinations(modelContext: modelContext)
             } content: {
                 HomeAssistantSetupScreen(mode: .create)
@@ -58,7 +67,24 @@ struct OnboardingScreen: View {
 
     private var heroSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ZStack {
+            VStack(alignment: .leading, spacing: 14) {
+                Label("HealthPush", systemImage: "heart.text.clipboard.fill")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+
+                Text("Push your Apple Health data where you control it.")
+                    .font(.system(.title, design: .rounded, weight: .bold))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("No accounts. No subscriptions. No HealthPush cloud. Your iPhone sends data directly to the destinations you configure.")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .fill(
                         LinearGradient(
@@ -67,30 +93,16 @@ struct OnboardingScreen: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(height: 210)
-
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("HealthPush", systemImage: "heart.text.clipboard.fill")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.9))
-
-                    Text("Push your Apple Health data where you control it.")
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                        .foregroundStyle(.white)
-
-                    Text("No accounts. No subscriptions. No HealthPush cloud. Your iPhone sends data directly to the destinations you configure.")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.9))
-                }
-                .padding(24)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            )
+            .accessibilityElement(children: .combine)
 
             HStack(spacing: 12) {
                 trustPill("Open source", systemImage: "chevron.left.forwardslash.chevron.right")
                 trustPill("Local first", systemImage: "iphone")
                 trustPill("No telemetry", systemImage: "lock.shield")
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Open source. Local first. No telemetry.")
         }
     }
 
@@ -125,44 +137,51 @@ struct OnboardingScreen: View {
             }
             .buttonStyle(.plain)
             .disabled(requestingHealthAccess)
+            .accessibilityLabel(appState.healthKitAuthorized ? "Health Access Granted" : "Review Health Access")
+            .accessibilityHint(appState.healthKitAuthorized ? "" : "Opens the Apple Health permissions dialog")
         }
         .sectionCardStyle()
     }
 
     private var destinationSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Choose your first destination")
+            Text("Set up a destination")
                 .font(.title3.weight(.semibold))
 
             checklistRow(
                 title: "Add at least one destination",
-                detail: "S3-compatible storage is the most direct export path today. Home Assistant is also available.",
+                detail: "Choose where your health data goes — S3 storage, Home Assistant, and more.",
                 isComplete: !destinationManager.destinations.isEmpty
             )
 
             Button {
-                showingAddS3 = true
+                showingAddDestination = true
             } label: {
-                destinationOption(
-                    title: "S3-Compatible Storage",
-                    detail: "Recommended for MVP use. Direct export to AWS S3, MinIO, and other compatible endpoints with JSON or CSV output.",
-                    systemImage: "externaldrive.fill",
-                    tint: .orange
-                )
-            }
-            .buttonStyle(.plain)
+                HStack(spacing: 14) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
 
-            Button {
-                showingAddHomeAssistant = true
-            } label: {
-                destinationOption(
-                    title: "Home Assistant",
-                    detail: "Best for dashboards and automations. Configure the custom integration, then paste the webhook URL.",
-                    systemImage: "house.fill",
-                    tint: .blue
-                )
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Add Destination")
+                            .font(.headline)
+                        Text("Pick from available destination types")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Add Destination")
+            .accessibilityHint("Opens destination type picker")
         }
         .sectionCardStyle()
     }
@@ -184,6 +203,7 @@ struct OnboardingScreen: View {
                     .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
+            .accessibilityHint("Closes the welcome guide")
         }
     }
 
@@ -200,6 +220,7 @@ struct OnboardingScreen: View {
             Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
                 .font(.title3)
                 .foregroundStyle(isComplete ? Color.green : Color.secondary)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
@@ -211,41 +232,8 @@ struct OnboardingScreen: View {
 
             Spacer()
         }
-    }
-
-    private func destinationOption(
-        title: String,
-        detail: String,
-        systemImage: String,
-        tint: Color
-    ) -> some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(tint.opacity(0.15))
-                    .frame(width: 52, height: 52)
-
-                Image(systemName: systemImage)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(tint)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                Text(detail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
-        }
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title), \(isComplete ? "complete" : "incomplete"). \(detail)")
     }
 
     private func requestHealthAccess() async {

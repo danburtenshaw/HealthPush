@@ -50,7 +50,7 @@ struct S3Client: Sendable {
     private let session: URLSession
 
     #if canImport(os)
-    private let logger = Logger(subsystem: "com.healthpush.app", category: "S3Client")
+    private let logger = Logger(subsystem: "app.healthpush", category: "S3Client")
     #endif
 
     init(

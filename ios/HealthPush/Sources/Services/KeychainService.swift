@@ -21,7 +21,7 @@ enum KeychainError: LocalizedError {
 
 struct KeychainService {
 
-    private static let service = "com.healthpush.app.destinations"
+    private static let service = "app.healthpush.destinations"
     private static let missingEntitlementStatus: OSStatus = -34018
     private static let fallbackStore = InMemorySecretStore()
 

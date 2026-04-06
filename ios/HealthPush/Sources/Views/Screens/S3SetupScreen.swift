@@ -231,6 +231,8 @@ struct S3SetupScreen: View {
                     || endpointValidationError != nil
                     || trimmedRegion.isEmpty
             )
+            .accessibilityLabel(s3TestConnectionAccessibilityLabel)
+            .accessibilityHint(isTesting ? "" : "Verifies the bucket, credentials, and endpoint are correct")
         }
     }
 
@@ -283,10 +285,18 @@ struct S3SetupScreen: View {
                 }
             }
             .tint(.primary)
+            .accessibilityLabel("Health Metrics")
+            .accessibilityValue("\(enabledMetrics.count) of \(HealthMetricType.allCases.count) selected")
+            .accessibilityHint("Opens the metric picker")
         } header: {
             Text("Data")
         } footer: {
-            Text("Choose which health metrics to sync to this destination.")
+            if enabledMetrics.isEmpty {
+                Text("Select at least one health metric to sync.")
+                    .foregroundStyle(.red)
+            } else {
+                Text("Choose which health metrics to sync to this destination.")
+            }
         }
     }
 
@@ -331,6 +341,21 @@ struct S3SetupScreen: View {
         }
     }
 
+    private var s3TestConnectionAccessibilityLabel: String {
+        if isTesting {
+            return "Testing connection"
+        }
+        if let testResult {
+            switch testResult {
+            case .success:
+                return "Test Connection, passed"
+            case .failure(let message):
+                return "Test Connection, failed: \(message)"
+            }
+        }
+        return "Test Connection"
+    }
+
     private var isEditing: Bool {
         if case .edit = mode { return true }
         return false
@@ -345,6 +370,7 @@ struct S3SetupScreen: View {
             && hasValidAccessKeyID
             && hasValidSecretAccessKey
             && HealthDataExporter.validatePathPrefix(pathPrefix) == nil
+            && !enabledMetrics.isEmpty
     }
 
     private var examplePath: String {

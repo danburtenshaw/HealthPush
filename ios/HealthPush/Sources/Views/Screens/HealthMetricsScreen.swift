@@ -98,9 +98,12 @@ struct HealthMetricsScreen: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .accessibilityHidden(true)
             }
         }
         .textCase(nil)
+        .accessibilityLabel("\(category.rawValue), \(selectedCount) of \(metrics.count) selected")
+        .accessibilityHint(isExpanded ? "Double tap to collapse" : "Double tap to expand")
     }
 
     @ViewBuilder

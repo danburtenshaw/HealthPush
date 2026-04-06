@@ -19,7 +19,7 @@ import os
 struct HealthDataExporter: Sendable {
 
     #if canImport(os)
-    private let logger = Logger(subsystem: "com.healthpush.app", category: "HealthDataExporter")
+    private let logger = Logger(subsystem: "app.healthpush", category: "HealthDataExporter")
     #endif
 
     // MARK: - Date Grouping

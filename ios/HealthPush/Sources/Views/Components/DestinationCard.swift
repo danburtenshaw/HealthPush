@@ -92,9 +92,26 @@ struct DestinationCard: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilitySummary)
     }
 
     // MARK: Helpers
+
+    private var accessibilitySummary: String {
+        var parts: [String] = []
+        parts.append("\(config.name), \(config.destinationType.displayName).")
+        parts.append(config.isEnabled ? "Enabled" : "Disabled")
+        parts.append("\(config.enabledMetrics.count) metrics.")
+        parts.append("Frequency: \(config.syncFrequency.displayName).")
+        if let nextSync = config.nextSyncTime {
+            if nextSync < Date.now {
+                parts.append("Next sync overdue.")
+            }
+        }
+        parts.append(syncSummary + ".")
+        return parts.joined(separator: " ")
+    }
 
     private var iconBackgroundColor: Color {
         switch config.destinationType {

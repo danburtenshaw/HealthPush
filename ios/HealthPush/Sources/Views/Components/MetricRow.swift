@@ -25,6 +25,7 @@ struct MetricRow: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(iconColor)
             }
+            .accessibilityHidden(true)
 
             // Metric info
             VStack(alignment: .leading, spacing: 2) {
@@ -35,6 +36,7 @@ struct MetricRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .accessibilityHidden(true)
 
             Spacer()
 
@@ -42,6 +44,9 @@ struct MetricRow: View {
             Toggle("", isOn: $isEnabled)
                 .labelsHidden()
                 .tint(.accentColor)
+                .accessibilityLabel("\(metric.displayName), \(metric.category.rawValue)")
+                .accessibilityValue(isEnabled ? "Enabled" : "Disabled")
+                .accessibilityHint(isEnabled ? "Double tap to stop syncing this metric" : "Double tap to start syncing this metric")
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())

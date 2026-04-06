@@ -19,11 +19,14 @@ targets:
     platform: iOS
     sources:
       - path: Sources
-    resources:
-      - path: Resources
+      - path: Resources/Assets.xcassets
+        type: folder
+        buildPhase: resources
+      - path: Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.healthpush.app
+        PRODUCT_BUNDLE_IDENTIFIER: app.healthpush
         INFOPLIST_FILE: Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Resources/HealthPush.entitlements
         MARKETING_VERSION: "1.0.0"
@@ -47,7 +50,7 @@ targets:
       - target: HealthPush
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.healthpush.app.tests
+        PRODUCT_BUNDLE_IDENTIFIER: app.healthpush.tests
         GENERATE_INFOPLIST_FILE: true
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/HealthPush.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/HealthPush"
         BUNDLE_LOADER: "$(TEST_HOST)"

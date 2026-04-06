@@ -51,7 +51,7 @@ actor HealthKitManager {
     // MARK: Properties
 
     private let healthStore: HKHealthStore
-    private let logger = Logger(subsystem: "com.healthpush.app", category: "HealthKit")
+    private let logger = Logger(subsystem: "app.healthpush", category: "HealthKit")
     private var observerQueries: [HKObserverQuery] = []
 
     // MARK: Initialization
@@ -372,7 +372,7 @@ actor HealthKitManager {
                 predicate: nil
             ) { _, completionHandler, error in
                 if let error {
-                    Logger(subsystem: "com.healthpush.app", category: "HealthKit")
+                    Logger(subsystem: "app.healthpush", category: "HealthKit")
                         .warning("Observer query error for \(metric.rawValue): \(error.localizedDescription)")
                     completionHandler()
                     return

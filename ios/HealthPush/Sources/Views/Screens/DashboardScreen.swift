@@ -1,5 +1,8 @@
 import SwiftUI
 import SwiftData
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - DashboardScreen
 
@@ -53,6 +56,14 @@ struct DashboardScreen: View {
                             setupChecklistCard
                         }
 
+                        if !appState.isBackgroundRefreshAvailable {
+                            backgroundRefreshWarning
+                        }
+
+                        if appState.lastSyncHadNoData && !appState.isSyncing {
+                            noDataWarning
+                        }
+
                         if let latestIssueRecord, !appState.isSyncing {
                             syncIssueCard(record: latestIssueRecord)
                         }
@@ -82,14 +93,20 @@ struct DashboardScreen: View {
                     } label: {
                         Image(systemName: "clock.arrow.circlepath")
                     }
+                    .accessibilityLabel("Sync History")
+                    .accessibilityHint("View past sync operations")
                 }
             }
             .sheet(isPresented: $showingSyncHistory) {
                 SyncHistoryScreen()
             }
-            .confirmationDialog("Add Destination", isPresented: $showingDestinationPicker) {
-                Button(DestinationType.s3.displayName) { showingAddS3 = true }
-                Button("Home Assistant") { showingAddHA = true }
+            .sheet(isPresented: $showingDestinationPicker) {
+                AddDestinationSheet { type in
+                    switch type {
+                    case .s3: showingAddS3 = true
+                    case .homeAssistant: showingAddHA = true
+                    }
+                }
             }
             .sheet(isPresented: $showingAddHA) {
                 destinationManager.loadDestinations(modelContext: modelContext)
@@ -144,6 +161,8 @@ struct DashboardScreen: View {
         }
         .disabled(appState.isSyncing)
         .sensoryFeedback(.impact(flexibility: .solid), trigger: appState.isSyncing)
+        .accessibilityLabel(appState.isSyncing ? "Syncing in progress" : "Sync Now")
+        .accessibilityHint(appState.isSyncing ? "" : "Sends health data to all enabled destinations")
     }
 
     private var destinationsSection: some View {
@@ -168,6 +187,7 @@ struct DashboardScreen: View {
                         DestinationCard(config: config)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityHint("Double tap to edit \(config.name)")
 
                     if appState.isSyncing {
                         let progress = appState.syncProgress[config.name] ?? 0
@@ -181,6 +201,8 @@ struct DashboardScreen: View {
                                 .foregroundStyle(.secondary)
                         }
                         .padding(.horizontal, 4)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("\(config.name) sync progress: \(status)")
                     }
                 }
             }
@@ -195,12 +217,13 @@ struct DashboardScreen: View {
             Image(systemName: "heart.text.clipboard")
                 .font(.system(size: 56))
                 .foregroundStyle(Color.accentColor.opacity(0.7))
+                .accessibilityHidden(true)
 
             VStack(spacing: 8) {
                 Text("Welcome to HealthPush")
                     .font(.title2.weight(.semibold))
 
-                Text("Connect a destination to start syncing your Apple Health data. S3-compatible storage is the most direct export path today, and Home Assistant is also available.")
+                Text("Connect a destination to start syncing your Apple Health data.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -208,11 +231,11 @@ struct DashboardScreen: View {
             }
 
             Button {
-                showingAddS3 = true
+                showingDestinationPicker = true
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "externaldrive.fill")
-                    Text("Add S3 Storage")
+                    Image(systemName: "plus.circle.fill")
+                    Text("Add Destination")
                         .font(.headline)
                 }
                 .frame(maxWidth: .infinity)
@@ -230,14 +253,6 @@ struct DashboardScreen: View {
                 Text("Open Welcome Guide")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
-            }
-
-            Button {
-                showingDestinationPicker = true
-            } label: {
-                Text("Choose Another Destination")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
             }
 
             Spacer()
@@ -263,16 +278,88 @@ struct DashboardScreen: View {
         }
     }
 
+    private var backgroundRefreshWarning: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Background Sync Unavailable", systemImage: "exclamationmark.triangle.fill")
+                .font(.headline)
+                .foregroundStyle(.yellow)
+
+            Text("Background App Refresh is turned off or Low Power Mode is active. HealthPush can only sync while you have the app open.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            .buttonStyle(.bordered)
+            .accessibilityHint("Opens iOS Settings to enable Background App Refresh")
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.yellow.opacity(0.10))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.yellow.opacity(0.25), lineWidth: 1)
+        }
+    }
+
+    private var noDataWarning: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("No Health Data Synced", systemImage: "heart.slash")
+                .font(.headline)
+                .foregroundStyle(.orange)
+
+            Text("Your first sync completed but found no health data. This usually means HealthPush does not have permission to read the selected metrics. You can review permissions in the Health app under Sharing > Apps > HealthPush.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 12) {
+                Button("Open Health App") {
+                    if let url = URL(string: "x-apple-health://") {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityHint("Opens Apple Health to review data sharing permissions")
+
+                Button("Review Destinations") {
+                    if let preferred = destinationManager.destinations.first(where: \.isEnabled) {
+                        selectedConfig = preferred
+                    }
+                }
+                .buttonStyle(.bordered)
+                .accessibilityHint("Opens the first enabled destination for review")
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.orange.opacity(0.10))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.25), lineWidth: 1)
+        }
+    }
+
     // MARK: Actions
 
     @MainActor
     private func performSync() async {
         guard !appState.isSyncing else { return }
         appState.isSyncing = true
+        BackgroundSyncScheduler.shared.setForegroundSyncing(true)
         appState.syncProgress = [:]
         appState.syncStatusText = [:]
         defer {
             appState.isSyncing = false
+            BackgroundSyncScheduler.shared.setForegroundSyncing(false)
             appState.syncProgress = [:]
             appState.syncStatusText = [:]
         }
@@ -370,6 +457,7 @@ struct DashboardScreen: View {
                     showingSyncHistory = true
                 }
                 .buttonStyle(.bordered)
+                .accessibilityHint("Opens sync history to review past operations")
 
                 Button("Review Destinations") {
                     if let preferred = destinationManager.destinations.first(where: \.isEnabled) {
@@ -377,6 +465,7 @@ struct DashboardScreen: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityHint("Opens the first enabled destination for review")
             }
         }
         .padding(18)
@@ -395,6 +484,7 @@ struct DashboardScreen: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(isComplete ? .green : .secondary)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -406,6 +496,8 @@ struct DashboardScreen: View {
 
             Spacer()
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title), \(isComplete ? "complete" : "incomplete"). \(detail)")
     }
 }
 
@@ -438,6 +530,17 @@ private struct RecentSyncRow: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(record.destinationName), \(statusDescription), \(record.dataPointCount) data points")
+    }
+
+    private var statusDescription: String {
+        switch record.status {
+        case .success: return "successful"
+        case .partialFailure: return "partially failed"
+        case .failure: return "failed"
+        case .inProgress: return "in progress"
+        }
     }
 
     private var statusIcon: String {

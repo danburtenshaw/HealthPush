@@ -53,7 +53,7 @@ final class SyncEngine: Observable {
 
     // MARK: Properties
 
-    private let logger = Logger(subsystem: "com.healthpush.app", category: "SyncEngine")
+    private let logger = Logger(subsystem: "app.healthpush", category: "SyncEngine")
     private var healthKitManager: HealthKitManager?
     private let networkService = NetworkService()
 
@@ -123,6 +123,12 @@ final class SyncEngine: Observable {
         var errors: [SyncDestinationError] = []
 
         for config in destinations {
+            // Skip destinations with no enabled metrics — nothing to sync.
+            if config.enabledMetrics.isEmpty {
+                logger.info("Skipping \(config.name) — no health metrics enabled")
+                continue
+            }
+
             // In background mode, skip destinations that were synced recently enough
             // per their own frequency. Manual "Sync Now" always syncs everything.
             if isBackground,

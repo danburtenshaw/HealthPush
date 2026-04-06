@@ -2,6 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>app.healthpush.sync.refresh</string>
+		<string>app.healthpush.sync.processing</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -23,18 +28,16 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>HealthPush reads your health data to sync it to your configured destinations such as Home Assistant. Your data is sent only to destinations you explicitly configure and is never shared with third parties.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>HealthPush does not write health data. This permission is reserved for future use.</string>
+	<string>HealthPush reads health data you select — including activity (steps, energy, distance, exercise), body measurements (weight, BMI, body fat), vitals (heart rate, blood pressure, blood oxygen, respiratory rate, temperature), sleep analysis, and nutrition (dietary energy, water intake) — to export it to destinations you configure, such as your own S3-compatible storage or Home Assistant instance. You choose which metrics to share on a per-destination basis. Data is sent directly from your device to your destinations. HealthPush has no backend servers, never collects your health data, and never shares it with third parties.</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
 		<string>processing</string>
-	</array>
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>com.healthpush.app.sync.refresh</string>
-		<string>com.healthpush.app.sync.processing</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
@@ -42,10 +45,5 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
-	<key>UIApplicationSceneManifest</key>
-	<dict>
-		<key>UIApplicationSupportsMultipleScenes</key>
-		<false/>
-	</dict>
 </dict>
 </plist>

@@ -20,7 +20,6 @@ struct AppStateTests {
             "sync_frequency",
             "scheduled_sync_frequency",
             "total_syncs_completed",
-            "sync_on_app_open",
             "data_retention_days",
             "healthkit_authorized",
             "has_seen_onboarding"

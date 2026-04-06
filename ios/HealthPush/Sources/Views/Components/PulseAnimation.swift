@@ -38,6 +38,7 @@ struct PulseAnimation: View {
                 .frame(width: 12, height: 12)
         }
         .frame(width: 60, height: 60)
+        .accessibilityHidden(true)
         .onChange(of: isAnimating, initial: true) { _, animating in
             if animating {
                 startAnimation()

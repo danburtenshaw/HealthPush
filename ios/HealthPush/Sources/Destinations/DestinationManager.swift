@@ -31,7 +31,7 @@ final class DestinationManager {
 
     // MARK: Properties
 
-    private let logger = Logger(subsystem: "com.healthpush.app", category: "DestinationManager")
+    private let logger = Logger(subsystem: "app.healthpush", category: "DestinationManager")
     private let networkService = NetworkService()
 
     /// All configured destinations, kept in sync with SwiftData.

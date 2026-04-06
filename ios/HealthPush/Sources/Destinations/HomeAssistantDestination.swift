@@ -52,7 +52,7 @@ struct HomeAssistantDestination: SyncDestination {
 
     private let enabledMetrics: Set<HealthMetricType>
     private let networkService: NetworkService
-    private let logger = Logger(subsystem: "com.healthpush.app", category: "HomeAssistant")
+    private let logger = Logger(subsystem: "app.healthpush", category: "HomeAssistant")
 
     // MARK: Initialization
 

@@ -107,13 +107,6 @@ struct HealthPushApp: App {
             }
         }
 
-        // Sync on open if configured
-        if appState.syncOnAppOpen {
-            Task {
-                await performForegroundSync(modelContext: context)
-            }
-        }
-
         // Re-register observers and re-schedule tasks when destinations change
         destinationManager.onDestinationsChanged = { [destinationManager, syncEngine] in
             let allMetrics = destinationManager.destinations

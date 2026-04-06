@@ -55,7 +55,7 @@ struct NetworkService: Sendable {
     // MARK: Properties
 
     private let session: URLSession
-    private let logger = Logger(subsystem: "com.healthpush.app", category: "Network")
+    private let logger = Logger(subsystem: "app.healthpush", category: "Network")
 
     // MARK: Initialization
 

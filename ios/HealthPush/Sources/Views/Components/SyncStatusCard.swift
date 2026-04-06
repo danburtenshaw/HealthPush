@@ -78,6 +78,8 @@ struct SyncStatusCard: View {
                     lineWidth: 1
                 )
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilitySummary)
     }
 
     // MARK: Subviews
@@ -114,6 +116,7 @@ struct SyncStatusCard: View {
                     .foregroundStyle(statusColor)
             }
         }
+        .accessibilityHidden(true)
     }
 
     // MARK: Computed Properties
@@ -150,6 +153,15 @@ struct SyncStatusCard: View {
         if lastSyncTime == "Never" { return .orange }
         if isSyncOverdue { return .orange }
         return .green
+    }
+
+    private var accessibilitySummary: String {
+        var parts: [String] = []
+        parts.append("Sync status: \(statusTitle).")
+        parts.append(statusSubtitle + ".")
+        parts.append("\(dataPointsSyncedToday) data points synced today.")
+        parts.append("\(totalSyncsCompleted) total syncs completed.")
+        return parts.joined(separator: " ")
     }
 
     private var statusIconName: String {

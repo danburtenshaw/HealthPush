@@ -1,4 +1,4 @@
-app_identifier("com.healthpush.app")
+app_identifier("app.healthpush")
 apple_id(ENV["APPLE_ID"] || "your-apple-id@example.com") # Your Apple Developer email
 team_id(ENV["TEAM_ID"] || "XXXXXXXXXX") # Your Apple Developer Team ID
 itc_team_id(ENV["ITC_TEAM_ID"] || "XXXXXXXXXX") # Your App Store Connect Team ID

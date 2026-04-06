@@ -14,12 +14,12 @@ final class BackgroundSyncScheduler: Sendable {
 
     // MARK: Constants
 
-    static let refreshTaskIdentifier = "com.healthpush.app.sync.refresh"
-    static let processingTaskIdentifier = "com.healthpush.app.sync.processing"
+    static let refreshTaskIdentifier = "app.healthpush.sync.refresh"
+    static let processingTaskIdentifier = "app.healthpush.sync.processing"
 
     // MARK: Properties
 
-    private let logger = Logger(subsystem: "com.healthpush.app", category: "BackgroundSync")
+    private let logger = Logger(subsystem: "app.healthpush", category: "BackgroundSync")
 
     /// The callback that performs the actual sync work. Set by the app on launch.
     private var syncHandler: (@Sendable () async -> Bool)?
@@ -29,7 +29,9 @@ final class BackgroundSyncScheduler: Sendable {
 
     /// Whether a sync is currently in progress. Prevents concurrent syncs
     /// from racing on destination resources (e.g., S3 read-modify-write).
-    private var isSyncing = false
+    /// Shared across foreground and background sync paths so that manual
+    /// "Sync Now" and observer-triggered syncs don't create duplicate records.
+    private(set) var isSyncing = false
 
     /// The last frequency used to schedule tasks. Used by task handlers to
     /// re-schedule with the correct interval (instead of reading a stale global default).
@@ -115,6 +117,13 @@ final class BackgroundSyncScheduler: Sendable {
     func cancelAllTasks() {
         BGTaskScheduler.shared.cancelAllTaskRequests()
         logger.info("All background tasks cancelled")
+    }
+
+    /// Marks a foreground (manual) sync as in progress, preventing observer-triggered
+    /// and background syncs from racing. Call with `true` before starting a foreground
+    /// sync and `false` when it finishes.
+    func setForegroundSyncing(_ syncing: Bool) {
+        isSyncing = syncing
     }
 
     // MARK: Observer Handling

@@ -156,6 +156,8 @@ struct HomeAssistantSetupScreen: View {
                 }
             }
             .disabled(isTesting || baseURL.isEmpty)
+            .accessibilityLabel(testConnectionAccessibilityLabel)
+            .accessibilityHint(isTesting ? "" : "Verifies the webhook URL and secret are correct")
         }
     }
 
@@ -191,10 +193,18 @@ struct HomeAssistantSetupScreen: View {
                 }
             }
             .tint(.primary)
+            .accessibilityLabel("Health Metrics")
+            .accessibilityValue("\(enabledMetrics.count) of \(HealthMetricType.allCases.count) selected")
+            .accessibilityHint("Opens the metric picker")
         } header: {
             Text("Data")
         } footer: {
-            Text("Choose which health metrics to sync to this destination.")
+            if enabledMetrics.isEmpty {
+                Text("Select at least one health metric to sync.")
+                    .foregroundStyle(.red)
+            } else {
+                Text("Choose which health metrics to sync to this destination.")
+            }
         }
     }
 
@@ -239,6 +249,21 @@ struct HomeAssistantSetupScreen: View {
         }
     }
 
+    private var testConnectionAccessibilityLabel: String {
+        if isTesting {
+            return "Testing connection"
+        }
+        if let testResult {
+            switch testResult {
+            case .success:
+                return "Test Connection, passed"
+            case .failure(let message):
+                return "Test Connection, failed: \(message)"
+            }
+        }
+        return "Test Connection"
+    }
+
     private var isEditing: Bool {
         if case .edit = mode { return true }
         return false
@@ -247,6 +272,7 @@ struct HomeAssistantSetupScreen: View {
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
         && !baseURL.trimmingCharacters(in: .whitespaces).isEmpty
+        && !enabledMetrics.isEmpty
     }
 
     // MARK: Data Loading

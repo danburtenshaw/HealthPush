@@ -52,7 +52,7 @@ struct S3Destination: SyncDestination {
     let isEnabled: Bool
 
     private let syncService: S3SyncService
-    private let logger = Logger(subsystem: "com.healthpush.app", category: "S3Destination")
+    private let logger = Logger(subsystem: "app.healthpush", category: "S3Destination")
 
     /// Progress callback: (filesCompleted, totalFiles).
     typealias ProgressHandler = @Sendable (Int, Int) -> Void
