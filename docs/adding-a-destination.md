@@ -1,4 +1,7 @@
-# Adding a New Destination
+---
+title: Adding a New Destination
+description: Extend HealthPush by implementing the shared SyncDestination protocol.
+---
 
 This guide walks through adding a new sync destination to HealthPush. Destinations are the core extension point -- they define where health data gets sent.
 

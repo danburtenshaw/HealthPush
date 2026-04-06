@@ -1,0 +1,69 @@
+---
+title: Quickstart
+description: Set up the HealthPush iOS app and connect your first destination.
+---
+
+This guide gets the existing HealthPush project running locally and points you at the first destination flows.
+
+## Prerequisites
+
+- Xcode 16 or newer
+- iOS 17 simulator or device
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+- Python 3.12 or newer for the Home Assistant integration
+
+## Run the iOS App
+
+```bash
+git clone https://github.com/danburtenshaw/HealthPush.git
+cd HealthPush/ios/HealthPush
+brew install xcodegen
+xcodegen
+open HealthPush.xcodeproj
+```
+
+Build and run the app from Xcode, then grant HealthKit permissions when prompted.
+
+## Configure a Destination
+
+HealthPush uses a shared destination model. Each configured target implements the same sync contract, while transport, authentication, and payload shaping stay destination-specific.
+
+### Home Assistant
+
+1. Install the custom component from `integrations/homeassistant`.
+2. Add the integration in Home Assistant.
+3. Copy the webhook URL into the app.
+4. Test the connection and save the destination.
+
+### Amazon S3
+
+1. Open the S3 setup screen in the app.
+2. Enter the bucket, region, and credentials.
+3. Test the connection.
+4. Save and enable sync.
+
+## Run Tests
+
+### iOS
+
+```bash
+cd ios/HealthPush
+xcodegen
+xcodebuild test \
+  -project HealthPush.xcodeproj \
+  -scheme HealthPush \
+  -destination 'platform=iOS Simulator,name=iPhone 16'
+```
+
+### Home Assistant
+
+```bash
+cd integrations/homeassistant
+python -m pytest
+```
+
+## Next Steps
+
+- Read [Architecture](/architecture) to understand the sync engine and destination model.
+- Use [Adding a New Destination](/adding-a-destination) if you want to extend the platform.
+- Review [Contributing](/contributing) before opening a pull request.

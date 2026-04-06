@@ -1,0 +1,48 @@
+---
+title: Contributing
+description: Development setup, testing workflow, and pull request conventions for HealthPush.
+---
+
+This page summarizes the main contributor workflow for HealthPush. The canonical repo guidance still lives in the project root files where appropriate.
+
+## Development Setup
+
+### iOS App
+
+```bash
+git clone https://github.com/danburtenshaw/HealthPush.git
+cd HealthPush/ios/HealthPush
+brew install xcodegen
+xcodegen
+open HealthPush.xcodeproj
+```
+
+### Home Assistant Integration
+
+```bash
+cd integrations/homeassistant
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements_test.txt
+python -m pytest
+```
+
+## Working Rules
+
+- Use Swift 6 with strict concurrency for the iOS app.
+- Keep the iOS app free of third-party dependencies.
+- Prefer reusable destination abstractions over destination-specific branching in shared code.
+- Update tests and docs when behavior changes.
+- Keep commit messages concise and imperative.
+
+## Pull Requests
+
+- Branch from `main`.
+- Keep the PR focused on one feature or fix.
+- Ensure tests pass locally before opening the PR.
+- Update docs when setup, behavior, or public interfaces change.
+
+## More Detail
+
+- Full contributor guide: [CONTRIBUTING.md](https://github.com/danburtenshaw/HealthPush/blob/main/CONTRIBUTING.md)
+- Repo-wide agent and architecture guidance: [AGENTS.md](https://github.com/danburtenshaw/HealthPush/blob/main/AGENTS.md)

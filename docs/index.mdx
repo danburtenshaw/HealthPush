@@ -1,0 +1,41 @@
+title: HealthPush
+description: Privacy-first Apple Health exports to destinations you control.
+sidebarTitle: Overview
+mode: wide
+---
+
+Sync Apple Health data to destinations you control, without routing it through a HealthPush backend.
+
+HealthPush is a privacy-first iOS app that reads Apple Health data and pushes it directly to systems you own or operate. The current app supports Home Assistant and Amazon S3, and the architecture is designed to keep future destinations like REST endpoints, Google Drive, Google Sheets, CSV exports, and similar targets straightforward to add.
+
+## Why HealthPush
+
+- No accounts, subscriptions, or telemetry.
+- Direct delivery from the device to the configured destination.
+- Background-first sync model built for unattended operation.
+- Destination-based architecture instead of a single integration path.
+- Open-source codebase with no third-party iOS dependencies.
+
+## Documentation Map
+
+- Start with [Quickstart](/quickstart) to run the iOS app and connect your first destination.
+- Read [Architecture](/architecture) for the shared sync model and app structure.
+- Use [Adding a New Destination](/adding-a-destination) when extending the destination system.
+- See [Contributing](/contributing) for repo setup, tests, and PR conventions.
+
+## Current Product Scope
+
+- Implemented destinations:
+  - Home Assistant
+  - Amazon S3
+- Primary product surface:
+  - Native iOS app in `ios/HealthPush`
+- Companion integration:
+  - Home Assistant custom component in `integrations/homeassistant`
+
+## Principles
+
+- Privacy-first: health data leaves the device only when the user configures a destination.
+- Local-first: app configuration and sync history stay on-device.
+- Destination-agnostic core: sync infrastructure should not be centered on one target.
+- Auditability: avoid third-party dependencies in the iOS app unless there is a strong reason.

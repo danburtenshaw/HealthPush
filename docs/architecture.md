@@ -1,4 +1,7 @@
-# Architecture
+---
+title: Architecture
+description: High-level architecture, data flow, and design choices for HealthPush.
+---
 
 This document describes the high-level architecture of HealthPush.
 
