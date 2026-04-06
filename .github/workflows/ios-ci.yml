@@ -12,6 +12,9 @@ on:
       - "ios/**"
       - ".github/workflows/ios-ci.yml"
 
+permissions:
+  contents: read
+
 concurrency:
   group: ios-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -26,11 +29,12 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
       PROJECT_DIR: ios/HealthPush
       SCHEME: HealthPush
-      DESTINATION: "platform=iOS Simulator,name=iPhone 16,OS=18.2"
+      BUILD_DESTINATION: "generic/platform=iOS Simulator"
+      PREFERRED_SIMULATOR: "iPhone 16"
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Select Xcode version
         run: |
@@ -45,8 +49,44 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: xcodegen generate
 
+      - name: Select simulator destination
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          DESTINATIONS="$(xcodebuild -project HealthPush.xcodeproj -scheme "$SCHEME" -showdestinations)"
+          printf '%s\n' "$DESTINATIONS"
+
+          PREFERRED_LINE="$(
+            printf '%s\n' "$DESTINATIONS" \
+              | grep 'platform:iOS Simulator' \
+              | grep "name:${PREFERRED_SIMULATOR}" \
+              | head -n 1 || true
+          )"
+
+          if [ -z "$PREFERRED_LINE" ]; then
+            PREFERRED_LINE="$(
+              printf '%s\n' "$DESTINATIONS" \
+                | grep 'platform:iOS Simulator' \
+                | grep -v 'name:Any iOS Simulator Device' \
+                | head -n 1 || true
+            )"
+          fi
+
+          DESTINATION_ID="$(
+            printf '%s\n' "$PREFERRED_LINE" \
+              | sed -n 's/.* id:\([^,}]*\).*/\1/p' \
+              | xargs
+          )"
+
+          if [ -z "$DESTINATION_ID" ]; then
+            echo "Unable to find an iOS Simulator destination" >&2
+            exit 1
+          fi
+
+          echo "Selected simulator: $PREFERRED_LINE"
+          echo "DESTINATION=id=$DESTINATION_ID" >> "$GITHUB_ENV"
+
       - name: Cache SPM dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5
         with:
           path: ${{ runner.temp }}/spm-cache
           key: spm-${{ runner.os }}-${{ hashFiles('ios/HealthPush/project.yml') }}
@@ -69,7 +109,7 @@ jobs:
             -project HealthPush.xcodeproj \
             -scheme "$SCHEME" \
             -configuration Release \
-            -destination "$DESTINATION" \
+            -destination "$BUILD_DESTINATION" \
             -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm-cache" \
             -skipPackagePluginValidation \
             CODE_SIGN_IDENTITY="-" \
@@ -94,7 +134,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: test-results
           path: ${{ runner.temp }}/TestResults.xcresult

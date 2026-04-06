@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Extract version from tag
         id: version
@@ -63,7 +63,7 @@ jobs:
       - name: Create GitHub Release
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
         with:
           name: "Home Assistant Integration v${{ steps.version.outputs.version }}"
           body_path: ${{ runner.temp }}/release-notes.md

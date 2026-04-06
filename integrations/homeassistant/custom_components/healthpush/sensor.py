@@ -115,9 +115,7 @@ class HealthPushSensor(SensorEntity, RestoreEntity):
         self._attr_native_unit_of_measurement = defn["unit"]
 
         if defn["device_class"] is not None:
-            self._attr_device_class = _DEVICE_CLASS_MAP.get(
-                defn["device_class"]
-            )
+            self._attr_device_class = _DEVICE_CLASS_MAP.get(defn["device_class"])
 
         state_class_str: str | None = defn.get("state_class")
         if state_class_str is not None:
@@ -126,9 +124,7 @@ class HealthPushSensor(SensorEntity, RestoreEntity):
         if defn["icon"] is not None:
             self._attr_icon = defn["icon"]
 
-        self._attr_suggested_display_precision = defn.get(
-            "suggested_precision"
-        )
+        self._attr_suggested_display_precision = defn.get("suggested_precision")
 
         self._attr_native_value = (
             initial_metric.get("value") if initial_metric is not None else None

@@ -50,9 +50,7 @@ def unregister_webhook(hass: HomeAssistant, entry: ConfigEntry) -> None:
     _LOGGER.debug("Unregistered HealthPush webhook: %s", webhook_id)
 
 
-def _build_handler(
-    hass: HomeAssistant, entry: ConfigEntry
-) -> Any:
+def _build_handler(hass: HomeAssistant, entry: ConfigEntry) -> Any:
     """Return an async webhook handler bound to a specific config entry."""
     secret: str = entry.data.get(CONF_WEBHOOK_SECRET, "")
 
@@ -105,9 +103,7 @@ def _build_handler(
         # --- Validate metrics ---
         metrics: list[dict[str, Any]] | None = data.get("metrics")
         if not isinstance(metrics, list) or not metrics:
-            _LOGGER.warning(
-                "HealthPush webhook payload missing 'metrics' list"
-            )
+            _LOGGER.warning("HealthPush webhook payload missing 'metrics' list")
             return web.Response(
                 status=HTTPStatus.BAD_REQUEST,
                 text="Missing or empty 'metrics' array",
