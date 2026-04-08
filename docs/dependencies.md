@@ -42,7 +42,7 @@ Currently empty. Added case-by-case when rolling our own would be *less* secure 
 2. Approval from the `privacy-reviewer` subagent on the introducing PR (see `.claude/agents/privacy-reviewer.md`).
 3. An explicit allowlist entry in `scripts/check-no-third-party-deps.sh`.
 4. An entry in every release SBOM.
-5. Dependabot coverage.
+5. Renovate coverage.
 6. A vendor health check: last commit < 90 days, security advisory history, maintainer reputation.
 
 Planned Tier 2 additions (not yet in the graph):
@@ -84,7 +84,7 @@ Dev-time tooling (ruff, mypy, bandit, pytest-cov, etc., pinned in `requirements_
 
 1. `scripts/check-no-third-party-deps.sh` — runs on every push/PR via `.github/workflows/lint.yml`, fails the build on any unexpected dependency.
 2. `.github/workflows/dependency-review.yml` — blocks PRs that introduce moderate+ severity vulnerabilities or licenses outside the allow-list.
-3. Dependabot — configured in `.github/dependabot.yml` for all ecosystems including `swift`.
+3. Renovate — configured in `renovate.json` for all ecosystems including `swift`. GitHub's Dependabot **security alerts** remain enabled at the repository level so Renovate can react to GHSA advisories via its `vulnerabilityAlerts` feature, but Dependabot version updates are disabled in favour of Renovate to avoid duplicate PRs.
 4. `privacy-reviewer` subagent — `.claude/agents/privacy-reviewer.md` audits any PR that changes the dependency graph.
 5. Release SBOM — generated on every release tag and attached to the GitHub Release (planned).
 
