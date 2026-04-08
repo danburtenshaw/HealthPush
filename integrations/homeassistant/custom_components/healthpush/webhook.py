@@ -6,6 +6,7 @@ import hmac
 from http import HTTPStatus
 import json
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
@@ -27,6 +28,21 @@ _LOGGER = logging.getLogger(__name__)
 
 # Maximum accepted payload size (512 KiB).
 _MAX_PAYLOAD_SIZE = 512 * 1024
+
+# Strip control characters (including CR/LF) from values that originate in the
+# request payload before they hit the log stream, so a malicious client cannot
+# inject forged log lines or escape sequences.
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f]")
+_MAX_LOGGED_DEVICE_NAME = 64
+
+
+def _sanitize_for_log(value: Any) -> str:
+    """Return a log-safe representation of an untrusted payload value."""
+    text = str(value) if value is not None else "unknown"
+    cleaned = _CONTROL_CHAR_RE.sub("?", text)
+    if len(cleaned) > _MAX_LOGGED_DEVICE_NAME:
+        cleaned = cleaned[:_MAX_LOGGED_DEVICE_NAME] + "..."
+    return cleaned
 
 
 def register_webhook(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -139,7 +155,7 @@ def _build_handler(entry: ConfigEntry) -> Any:
         _LOGGER.debug(
             "HealthPush received %d metric(s) from %s",
             len(valid_metrics),
-            data.get("device_name", "unknown"),
+            _sanitize_for_log(data.get("device_name")),
         )
 
         async_dispatcher_send(
