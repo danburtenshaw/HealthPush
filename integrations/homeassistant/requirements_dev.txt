@@ -7,5 +7,10 @@ mypy==1.13.0
 bandit[toml]==1.8.0
 pytest-cov==6.0.0
 pytest-asyncio==0.24.0
-# pytest-homeassistant-custom-component will be added when tests need HA fixtures.
-# Current tests only exercise payloads.py with vanilla unittest.TestCase.
+# homeassistant is installed for its type stubs — mypy strict on the custom
+# component needs to see ConfigFlow, HomeAssistant, and the helpers modules
+# as real types, not Any. aiohttp comes in transitively.
+# pytest-homeassistant-custom-component is intentionally *not* pinned: its
+# transitive acme/josepy pins conflict at import time. Add it back alongside
+# a matching HA version when tests start using its fixtures.
+homeassistant>=2024.10.0
