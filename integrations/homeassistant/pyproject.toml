@@ -136,6 +136,11 @@ exclude = ["tests/.*"]
 
 # HA core and pytest-homeassistant-custom-component lack complete types
 # — tolerate that without masking real issues in our code.
+# HA 2026.x ships a py.typed marker, so mypy will eagerly type-check the
+# installed package and surface errors we neither caused nor can fix.
+# `follow_imports = "skip"` tells mypy to only treat HA's public API as
+# opaque types (similar to the pre-py.typed behavior) instead of walking
+# into its source tree.
 [[tool.mypy.overrides]]
 module = [
   "homeassistant.*",
@@ -143,6 +148,7 @@ module = [
   "voluptuous.*",
 ]
 ignore_missing_imports = true
+follow_imports = "skip"
 
 # ──────────────────────────────────────────────────────────────────────
 # bandit — security linter
