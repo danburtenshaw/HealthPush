@@ -1,0 +1,23 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    "group:allNonMajor",
+    "schedule:weekly"
+  ],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "matchManagers": ["pip_requirements", "pip-compile", "pep621"],
+      "addLabels": ["python"]
+    },
+    {
+      "matchManagers": ["swift"],
+      "addLabels": ["swift"]
+    },
+    {
+      "matchManagers": ["bundler"],
+      "addLabels": ["ruby"]
+    }
+  ]
+}

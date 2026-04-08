@@ -97,7 +97,7 @@ ci:
   - changed-files:
       - any-glob-to-any-file:
           - ".github/workflows/**"
-          - ".github/dependabot.yml"
+          - "renovate.json"
           - ".github/labels.yml"
           - ".github/labeler.yml"
           - "scripts/**"

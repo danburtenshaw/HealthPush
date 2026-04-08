@@ -20,12 +20,13 @@ concurrency:
 jobs:
   lint:
     name: Validate PR title
-    # Dependabot PRs already use Conventional Commits by convention
-    # (`chore(deps): bump ...`) and run with a restricted GITHUB_TOKEN
-    # that can't satisfy pull_request_target permission requirements,
-    # so the action errors with "Resource not accessible by integration".
-    # Skip the validator for bot PRs; they're already well-formed.
-    if: github.actor != 'dependabot[bot]' && github.actor != 'github-actions[bot]'
+    # Bot PRs (Renovate, release-please) already use Conventional Commits
+    # by convention (`chore(deps): update ...`) and run with restricted
+    # tokens that can't always satisfy pull_request_target permission
+    # requirements, so the action errors with "Resource not accessible by
+    # integration". Skip the validator for bot PRs; they're already
+    # well-formed.
+    if: github.actor != 'renovate[bot]' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:

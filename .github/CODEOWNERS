@@ -28,7 +28,7 @@
 
 # ── CI/CD and repo tooling — require review for every change ────
 /.github/workflows/                     @danburtenshaw
-/.github/dependabot.yml                 @danburtenshaw
+/renovate.json                          @danburtenshaw
 /.github/labels.yml                     @danburtenshaw
 /.github/CODEOWNERS                     @danburtenshaw
 /scripts/                               @danburtenshaw
