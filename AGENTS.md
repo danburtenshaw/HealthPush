@@ -168,6 +168,21 @@ Adding a new destination:
 4. Add configuration UI in `Views/Screens/`
 5. Add or update tests for sync behavior, connection testing, and config validation
 
+## Claude Code Tooling
+
+If you use [Claude Code](https://claude.com/claude-code) for this repo, the `.claude/` directory ships project-wide automations. They're opt-in — contributors using other tools can ignore them.
+
+- **Subagents** (`.claude/agents/`)
+  - `privacy-reviewer` — audits Swift changes for the three non-negotiables (no third-party deps, no telemetry, no HealthPush-hosted relays). Invoke after touching network code, dependencies, or background tasks.
+  - `destination-abstraction-reviewer` — flags Home Assistant or S3 quirks leaking into shared sync infrastructure (`SyncEngine`, `HealthDataExporter`, shared models). Invoke after touching `Sources/Services/**` or `Sources/Models/**`.
+- **Skills** (`.claude/skills/`)
+  - `/new-destination` — scaffolds a new `SyncDestination` end-to-end (enum case, config fields, destination struct, `DestinationManager` wiring, setup screen, tests).
+  - `/ios-test` — runs the iOS test suite against the iPhone 16 simulator, regenerating the Xcode project first.
+- **Hooks** (`.claude/hooks/`)
+  - `xcodegen-regen.sh` — `PostToolUse` hook that automatically runs `xcodegen` whenever `ios/HealthPush/project.yml` is edited, so the generated `.xcodeproj` never drifts.
+
+Personal overrides (extra permissions, experimental flags) belong in `.claude/settings.local.json`, which is gitignored.
+
 ## Guidance For Agents
 
 - Preserve the positioning of HealthPush as a multi-destination open-source platform.
