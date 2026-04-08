@@ -8,10 +8,14 @@ on:
     types: [opened, edited, synchronize, reopened]
 
 permissions:
-  # amannn/action-semantic-pull-request needs `write` to manage the WIP
-  # label (wip: true). Read-only permission produces a confusing
-  # "Resource not accessible by integration" error on every run.
-  pull-requests: write
+  # amannn/action-semantic-pull-request reads the PR title, and — because
+  # `wip: true` is set — posts a commit status via the Statuses API when
+  # the title is WIP. That requires `statuses: write`, NOT
+  # `pull-requests: write`; the action's README is misleading. Without
+  # `statuses: write` the action fails with the confusing error
+  # "Resource not accessible by integration".
+  pull-requests: read
+  statuses: write
 
 concurrency:
   group: commitlint-${{ github.ref }}
