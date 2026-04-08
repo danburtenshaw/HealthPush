@@ -51,7 +51,7 @@ def _signal_for_entry(entry_id: str) -> str:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: ConfigEntry[Any],
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up HealthPush sensor entities from a config entry."""
@@ -99,7 +99,7 @@ class HealthPushSensor(SensorEntity, RestoreEntity):
 
     def __init__(
         self,
-        entry: ConfigEntry,
+        entry: ConfigEntry[Any],
         metric_type: str,
         initial_metric: dict[str, Any] | None = None,
     ) -> None:

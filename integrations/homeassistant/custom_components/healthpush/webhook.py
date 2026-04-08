@@ -45,7 +45,7 @@ def _sanitize_for_log(value: Any) -> str:
     return cleaned
 
 
-def register_webhook(hass: HomeAssistant, entry: ConfigEntry) -> None:
+def register_webhook(hass: HomeAssistant, entry: ConfigEntry[Any]) -> None:
     """Register the webhook endpoint for a config entry."""
     webhook_id: str = entry.data["webhook_id"]
 
@@ -60,7 +60,7 @@ def register_webhook(hass: HomeAssistant, entry: ConfigEntry) -> None:
     _LOGGER.debug("Registered HealthPush webhook: %s", webhook_id)
 
 
-def unregister_webhook(hass: HomeAssistant, entry: ConfigEntry) -> None:
+def unregister_webhook(hass: HomeAssistant, entry: ConfigEntry[Any]) -> None:
     """Remove the webhook endpoint for a config entry."""
     webhook_id: str = entry.data["webhook_id"]
     webhook_unregister(hass, webhook_id)
@@ -108,7 +108,7 @@ async def _read_and_parse(
         )
 
 
-def _build_handler(entry: ConfigEntry) -> Any:
+def _build_handler(entry: ConfigEntry[Any]) -> Any:
     """Return an async webhook handler bound to a specific config entry.
 
     ``hass`` is intentionally not an argument here — it is passed to the inner
