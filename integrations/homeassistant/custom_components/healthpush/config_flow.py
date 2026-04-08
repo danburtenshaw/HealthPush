@@ -5,11 +5,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import voluptuous as vol
-
 from homeassistant.components.webhook import async_generate_url
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.helpers import config_validation as cv
+import voluptuous as vol
 
 from .const import CONF_WEBHOOK_SECRET, DOMAIN
 
@@ -27,9 +26,7 @@ class HealthPushConfigFlow(ConfigFlow, domain=DOMAIN):
         self._webhook_secret: str = ""
         self._webhook_id: str = ""
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the initial user configuration step."""
         errors: dict[str, str] = {}
 

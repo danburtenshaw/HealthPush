@@ -88,18 +88,21 @@ If you need the full detail, read [`docs/sync-behavior.mdx`](docs/sync-behavior.
 ### Run The App
 
 1. **Clone the repo**
+
    ```bash
    git clone https://github.com/danburtenshaw/HealthPush.git
    cd HealthPush/ios/HealthPush
    ```
 
 2. **Generate the Xcode project** (requires [XcodeGen](https://github.com/yonaskolb/XcodeGen))
+
    ```bash
    brew install xcodegen
    xcodegen
    ```
 
 3. **Open in Xcode**
+
    ```bash
    open HealthPush.xcodeproj
    ```
@@ -173,7 +176,7 @@ If you need the full detail, read [`docs/sync-behavior.mdx`](docs/sync-behavior.
 
 HealthPush follows a clean, protocol-oriented architecture:
 
-```
+```text
 Apple Health (HealthKit)
         |
    Sync Engine          <-- Reads data, manages scheduling

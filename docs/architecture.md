@@ -9,7 +9,7 @@ This document describes the high-level architecture of HealthPush.
 
 HealthPush follows a clean, layered architecture with clear separation of concerns:
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │              SwiftUI Views              │  Presentation
 ├─────────────────────────────────────────┤
@@ -63,7 +63,7 @@ All views use SwiftUI and target iOS 17+. Views observe `AppState` for reactive 
 
 ### Manual Sync
 
-```
+```text
 User taps "Sync Now"
   → AppState triggers sync
     → HealthKit Service queries recent data
@@ -77,7 +77,7 @@ User taps "Sync Now"
 
 ### Background Sync
 
-```
+```text
 BGTaskScheduler fires
   → Background Sync Service wakes
     → Same flow as manual sync
@@ -97,7 +97,7 @@ BGTaskScheduler fires
 
 The HA side is a custom component (`integrations/homeassistant/custom_components/healthpush/`):
 
-```
+```text
 HealthPush iOS App
   → HTTPS POST /api/webhook/<webhook_id>
     → HA custom component receives data
@@ -106,6 +106,7 @@ HealthPush iOS App
 ```
 
 The component:
+
 - Registers a webhook during config flow setup
 - Parses incoming health data payloads
 - Registers sensor entities with proper device classes, units, and icons, then updates them as webhook data arrives

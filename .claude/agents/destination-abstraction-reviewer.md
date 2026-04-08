@@ -55,7 +55,7 @@ Flag any of these in the **destination-agnostic** files:
 
 ## Output format
 
-```
+```text
 DESTINATION ABSTRACTION REVIEW — [PASS | NEEDS CHANGES]
 
 Checked: <list of shared files you reviewed>

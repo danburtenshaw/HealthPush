@@ -101,6 +101,9 @@ jobs:
             !.local/**
             !**/CHANGELOG.md
             !**/node_modules/**
+            !**/.pytest_cache/**
+            !**/.build/**
+            !**/DerivedData/**
 
   # ── YAML lint ──────────────────────────────────────────────────────
   yaml-lint:

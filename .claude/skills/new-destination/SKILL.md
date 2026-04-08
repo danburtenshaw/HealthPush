@@ -53,6 +53,7 @@ enum DestinationType: String, Codable, Sendable, CaseIterable, Identifiable {
 **First try to reuse existing fields.** `DestinationConfig` already has `baseURL`, `apiToken`, and the `enabledMetrics` set, plus a `s3*` prefix for S3-only fields. Only add new fields if none of the existing ones fit.
 
 If you must add fields:
+
 - Use a prefix that makes ownership obvious (`rest…`, `gdrive…`, `mqtt…`)
 - Give them defaults so existing SwiftData records don't need a migration
 - Store any credentials via the keychain pattern — mirror `s3SecretAccessKeyKeychainKey` (`secureStoredSecretsIfNeeded`, `apiTokenValue(migratingIfNeeded:)`)
@@ -106,6 +107,7 @@ struct <Name>Destination: SyncDestination {
 ```
 
 **Hard rules**:
+
 - Must be `Sendable` (struct, let-only, or explicit `@unchecked Sendable` with justification)
 - Use shared `HealthDataExporter` for grouping, UUID dedup, and format serialization — **do not reimplement**
 - Only import Apple frameworks (no third-party SDKs — see the `privacy-reviewer` agent)
@@ -170,6 +172,7 @@ File: `ios/HealthPush/Sources/Views/Screens/<Name>SetupScreen.swift`
 Reference: `S3SetupScreen.swift` (610 lines — comprehensive example) or `HomeAssistantSetupScreen.swift`.
 
 Required sections:
+
 1. Config fields (`TextField`, `SecureField`, etc.)
 2. Metric picker (reuse the pattern from existing setup screens)
 3. Sync frequency picker
@@ -185,6 +188,7 @@ File: `ios/HealthPush/Tests/<Name>DestinationTests.swift`
 Reference: `S3DestinationIntegrationTests.swift`.
 
 Minimum coverage:
+
 - `init(config:)` — valid config, invalid config (missing fields, malformed URLs)
 - `testConnection()` — success path and failure path (use a mock URLSession or a fake client)
 - `sync(data:)` — empty array, single data point, multiple metrics, duplicate detection

@@ -10,22 +10,22 @@ Governance, decision-making, and how to become a maintainer are described in [`G
 
 ## Active Maintainers
 
-| Maintainer | GitHub | Areas of ownership |
-|---|---|---|
-| Dan Burtenshaw | [@danburtenshaw](https://github.com/danburtenshaw) | iOS app, Home Assistant integration, docs, release management |
+| Maintainer     | GitHub                                              | Areas of ownership                                            |
+| -------------- | --------------------------------------------------- | ------------------------------------------------------------- |
+| Dan Burtenshaw | [@danburtenshaw](https://github.com/danburtenshaw)  | iOS app, Home Assistant integration, docs, release management |
 
 ## Areas of Ownership
 
 These areas describe which maintainer is the first reviewer for changes in each part of the repo. Any maintainer may review any change; this is just a default routing.
 
-| Area | Path | Primary owner(s) |
-|---|---|---|
-| iOS app | `ios/HealthPush/` | @danburtenshaw |
-| Fastlane + release automation | `fastlane/`, `.github/workflows/release-*.yml` | @danburtenshaw |
-| Home Assistant integration | `integrations/homeassistant/` | @danburtenshaw |
-| Storage core package | `packages/HealthPushStorageCore/` | @danburtenshaw |
-| Shared docs + architecture | `docs/`, `CLAUDE.md`, `AGENTS.md` | @danburtenshaw |
-| CI/CD and repo tooling | `.github/`, `scripts/`, `.pre-commit-config.yaml` | @danburtenshaw |
+| Area                           | Path                                             | Primary owner(s) |
+| ------------------------------ | ------------------------------------------------ | ---------------- |
+| iOS app                        | `ios/HealthPush/`                                | @danburtenshaw   |
+| Fastlane + release automation  | `fastlane/`, `.github/workflows/release-*.yml`   | @danburtenshaw   |
+| Home Assistant integration     | `integrations/homeassistant/`                    | @danburtenshaw   |
+| Storage core package           | `packages/HealthPushStorageCore/`                | @danburtenshaw   |
+| Shared docs + architecture     | `docs/`, `CLAUDE.md`, `AGENTS.md`                | @danburtenshaw   |
+| CI/CD and repo tooling         | `.github/`, `scripts/`, `.lefthook.yml`          | @danburtenshaw   |
 
 When the maintainer team grows, this table should be updated before `CODEOWNERS` references any new handles.
 

@@ -35,7 +35,7 @@ When reviewing changes, flag any of:
 
 ## Output format
 
-```
+```text
 PRIVACY REVIEW — [PASS | FAIL]
 
 Checked: <one-line summary of files and greps you ran>

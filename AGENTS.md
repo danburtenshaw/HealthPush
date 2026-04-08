@@ -15,17 +15,20 @@ Home Assistant is the first major integration, but the broader product direction
 ## Product Direction
 
 ### Long-Term Vision
+
 - Build the open-source standard for exporting Apple Health data to user-controlled destinations.
 - Support multiple destination types without making any single integration the architectural center of the app.
 - Keep the app understandable and auditable: follow the tiered dependency policy in `docs/dependencies.md`. The iOS app target stays at zero SPM deps; internal packages under `packages/` may use only allowlisted Apple-stewarded libraries.
 - Preserve direct data flow from device to destination whenever feasible. Avoid introducing HealthPush-operated infrastructure.
 
 ### MVP Positioning
+
 - The MVP does not need every planned destination.
 - The MVP must prove the core value proposition: reliable Apple Health export, good onboarding, background sync, and enough trust signals that users can safely adopt it.
 - Destination count is less important than one polished end-to-end workflow and a destination architecture that makes later additions straightforward.
 
 ### Product Decision Rules
+
 - Prefer reusable destination primitives over one-off integrations.
 - Prefer a smaller, reliable destination set over a broad but brittle one.
 - Avoid hard-coding Home Assistant assumptions into shared sync logic.
@@ -64,6 +67,7 @@ HealthPush/
 ## Tech Stack
 
 ### iOS App
+
 - **Language**: Swift 6+ with strict concurrency
 - **UI**: SwiftUI (iOS 17+)
 - **Health**: HealthKit framework
@@ -73,11 +77,13 @@ HealthPush/
 - **Project**: XcodeGen (`project.yml` generates `.xcodeproj`)
 
 ### Home Assistant Integration
+
 - **Language**: Python 3.12+
 - **Framework**: Home Assistant custom component
 - **Distribution**: HACS-compatible
 
 ### CI/CD
+
 - **CI**: GitHub Actions (build, test, lint)
 - **Deploy**: Fastlane (App Store Connect)
 - **Code Gen**: XcodeGen (run `xcodegen` in `ios/HealthPush/`)
@@ -117,6 +123,7 @@ Examples of target destination families HealthPush should be able to support ove
 ## Development Workflow
 
 ### iOS App
+
 ```bash
 cd ios/HealthPush
 xcodegen                    # Generate .xcodeproj from project.yml
@@ -124,12 +131,14 @@ open HealthPush.xcodeproj   # Open in Xcode
 ```
 
 ### Home Assistant Integration
+
 ```bash
 cp -r integrations/homeassistant/custom_components/healthpush \
   ~/.homeassistant/custom_components/
 ```
 
 ### Running Tests
+
 ```bash
 cd ios/HealthPush && xcodegen && xcodebuild test \
   -project HealthPush.xcodeproj \

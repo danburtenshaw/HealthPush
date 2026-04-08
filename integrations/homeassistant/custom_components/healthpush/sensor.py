@@ -3,22 +3,24 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN, METRIC_DEFINITIONS
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,9 +81,7 @@ async def async_setup_entry(
 
                 known_sensors[metric_type].update_from_metric(metric)
             except Exception:
-                _LOGGER.exception(
-                    "Error processing metric '%s'", metric.get("type", "?")
-                )
+                _LOGGER.exception("Error processing metric '%s'", metric.get("type", "?"))
 
     # Subscribe to webhook data dispatches for this config entry.
     entry_data["unsub_dispatcher"] = async_dispatcher_connect(
@@ -130,9 +130,7 @@ class HealthPushSensor(SensorEntity, RestoreEntity):
             initial_metric.get("value") if initial_metric is not None else None
         )
         self._extra: dict[str, Any] = (
-            self._extra_from_metric(initial_metric)
-            if initial_metric is not None
-            else {}
+            self._extra_from_metric(initial_metric) if initial_metric is not None else {}
         )
 
     @property

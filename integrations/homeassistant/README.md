@@ -45,7 +45,7 @@ Restart Home Assistant after copying.
 
 ## How it works
 
-```
+```text
 iPhone                       Home Assistant
   |                               |
   |  POST /api/webhook/<id>       |
@@ -122,7 +122,7 @@ The iOS app sends a JSON POST to the webhook URL:
 
 If a webhook secret is configured, the app must include it as an HTTP header:
 
-```
+```http
 X-Webhook-Secret: your-secret-here
 ```
 

@@ -18,10 +18,10 @@ Unlimited. These ship with iOS/macOS and have no separate supply chain risk.
 
 Allowlisted by **exact repository URL** in `scripts/check-no-third-party-deps.sh`. These are effectively Apple code shipped as Swift packages. Current members:
 
-| Package | Role | Why allowlisted |
-|---|---|---|
+| Package                                                       | Role             | Why allowlisted                                                                                                                              |
+| ------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`apple/swift-crypto`](https://github.com/apple/swift-crypto) | `Crypto` library | Used by `HealthPushStorageCore` to provide a stable crypto API across Apple and non-Apple platforms. Apple-maintained. Already in the graph. |
-| [`apple/swift-asn1`](https://github.com/apple/swift-asn1) | ASN.1 codec | Transitive dependency of `swift-crypto`. Apple-maintained. |
+| [`apple/swift-asn1`](https://github.com/apple/swift-asn1)     | ASN.1 codec      | Transitive dependency of `swift-crypto`. Apple-maintained.                                                                                   |
 
 Adding a new Tier 1 package requires updating the allowlist in the check script and this table in the same PR.
 
@@ -47,8 +47,8 @@ Currently empty. Added case-by-case when rolling our own would be *less* secure 
 
 Planned Tier 2 additions (not yet in the graph):
 
-| Package | When it would be added | Rationale |
-|---|---|---|
+| Package                                                       | When it would be added                                           | Rationale                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`openid/AppAuth-iOS`](https://github.com/openid/AppAuth-iOS) | When Google Drive or Google Sheets destinations ship (post v1.0) | Rolling your own OAuth2 PKCE client is a known CVE farm — redirect URI validation, token leakage, refresh token races, state parameter handling, timing attacks. `AppAuth-iOS` is the canonical OAuth2 library from the OpenID Foundation (the same group that authored the spec). Apache-2.0. Used by Google's own sample apps. |
 
 ### Tier 3 — Everything else

@@ -4,12 +4,12 @@ HealthPush is a privacy-first, open-source iOS app and Home Assistant integratio
 
 ## Supported Versions
 
-| Component | Version | Supported |
-|---|---|---|
-| iOS App | latest App Store build | ✅ |
-| iOS App | previous minor release | ✅ for critical issues during a 30-day grace window |
-| Home Assistant Integration | latest tag + HACS default | ✅ |
-| `HealthPushStorageCore` package | latest tag | ✅ |
+| Component                       | Version                   | Supported                                           |
+| ------------------------------- | ------------------------- | --------------------------------------------------- |
+| iOS App                         | latest App Store build    | ✅                                                  |
+| iOS App                         | previous minor release    | ✅ for critical issues during a 30-day grace window |
+| Home Assistant Integration      | latest tag + HACS default | ✅                                                  |
+| `HealthPushStorageCore` package | latest tag                | ✅                                                  |
 
 Older versions are unsupported. Please reproduce issues on the latest release before reporting.
 
@@ -21,7 +21,7 @@ Please report privately via **[GitHub Security Advisories](https://github.com/da
 
 If GitHub Security Advisories is unavailable, you may email the maintainers at:
 
-> **security@healthpush.app**
+> **<security@healthpush.app>**
 
 Please include:
 
@@ -37,11 +37,11 @@ GitHub Security Advisories encrypts your report in transit and at rest, which is
 
 ### What to expect
 
-| When | What |
-|---|---|
-| Within **48 hours** | We acknowledge receipt of the report. |
-| Within **7 days** | Initial assessment — severity, likely fix timeline, any clarifying questions. |
-| Within **90 days** | Fix released, advisory published, and credit (if desired) given. Critical issues are addressed faster — typically within 7-14 days. |
+| When                | What                                                                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Within **48 hours** | We acknowledge receipt of the report.                                                                                               |
+| Within **7 days**   | Initial assessment — severity, likely fix timeline, any clarifying questions.                                                       |
+| Within **90 days**  | Fix released, advisory published, and credit (if desired) given. Critical issues are addressed faster — typically within 7-14 days. |
 
 We follow **90-day coordinated disclosure**. If we cannot ship a fix within 90 days we will coordinate a mutually acceptable extension with the reporter.
 

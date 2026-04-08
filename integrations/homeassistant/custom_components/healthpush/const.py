@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Any, Final
 
 DOMAIN: Final = "healthpush"
-CONF_WEBHOOK_SECRET: Final = "webhook_secret"
+# S105 false positive: this is the name of a voluptuous config-schema key,
+# not the value of a secret. The actual secret value is entered by the user.
+CONF_WEBHOOK_SECRET: Final = "webhook_secret"  # noqa: S105
 
 # Metric type definitions.
 # Each key is the metric type string sent by the iOS app (sensorEntitySuffix).
@@ -16,7 +18,7 @@ CONF_WEBHOOK_SECRET: Final = "webhook_secret"
 #   state_class         — HA SensorStateClass string
 #   icon                — MDI icon override (or None to let HA pick)
 #   suggested_precision — decimal places for display
-METRIC_DEFINITIONS: Final[dict[str, dict]] = {
+METRIC_DEFINITIONS: Final[dict[str, dict[str, Any]]] = {
     # ── Activity ─────────────────────────────────────────────────────────
     "steps": {
         "name": "Steps",

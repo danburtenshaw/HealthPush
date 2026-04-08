@@ -22,13 +22,13 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 
 ### Prerequisites
 
-| Tool | Version | Purpose |
-|---|---|---|
-| Xcode | 16.0+ | iOS app development |
-| XcodeGen | latest | Generates `.xcodeproj` from `project.yml` |
-| Swift | 6.0+ | iOS app language |
-| Python | 3.12+ | Home Assistant integration |
-| Git | latest | Version control |
+| Tool     | Version | Purpose                                   |
+| -------- | ------- | ----------------------------------------- |
+| Xcode    | 16.0+   | iOS app development                       |
+| XcodeGen | latest  | Generates `.xcodeproj` from `project.yml` |
+| Swift    | 6.0+    | iOS app language                          |
+| Python   | 3.12+   | Home Assistant integration                |
+| Git      | latest  | Version control                           |
 
 ### iOS App Setup
 
@@ -96,7 +96,7 @@ If you don't want local hooks, just don't install lefthook — nothing else depe
 
 ## Project Structure
 
-```
+```text
 HealthPush/
 ├── ios/HealthPush/          # Native iOS app (SwiftUI + HealthKit)
 │   ├── Sources/
@@ -168,19 +168,19 @@ Format:
 
 **Valid types:**
 
-| Type       | Meaning                                                    |
-|------------|------------------------------------------------------------|
-| `feat`     | New user-visible functionality                             |
-| `fix`      | Bug fix                                                    |
-| `perf`     | Performance improvement                                    |
-| `refactor` | Code change that does not add functionality or fix a bug   |
-| `docs`     | Documentation only                                         |
-| `test`     | Test additions or corrections                              |
-| `chore`    | Routine maintenance, tooling, configuration                |
-| `ci`       | CI/CD pipeline changes                                     |
-| `build`    | Build system, packaging, Fastlane                          |
-| `security` | Security-related change or hardening                       |
-| `revert`   | Revert of a previous commit                                |
+| Type       | Meaning                                                  |
+| ---------- | -------------------------------------------------------- |
+| `feat`     | New user-visible functionality                           |
+| `fix`      | Bug fix                                                  |
+| `perf`     | Performance improvement                                  |
+| `refactor` | Code change that does not add functionality or fix a bug |
+| `docs`     | Documentation only                                       |
+| `test`     | Test additions or corrections                            |
+| `chore`    | Routine maintenance, tooling, configuration              |
+| `ci`       | CI/CD pipeline changes                                   |
+| `build`    | Build system, packaging, Fastlane                        |
+| `security` | Security-related change or hardening                     |
+| `revert`   | Revert of a previous commit                              |
 
 **Valid scopes** (optional but recommended):
 
@@ -281,11 +281,11 @@ python -m pytest
 
 ### PR Size Guidelines
 
-| Size | Lines Changed | Review Time |
-|---|---|---|
-| Small | < 100 | Same day |
-| Medium | 100 - 400 | 1-2 days |
-| Large | 400+ | Consider splitting |
+| Size   | Lines Changed | Review Time        |
+| ------ | ------------- | ------------------ |
+| Small  | < 100         | Same day           |
+| Medium | 100 - 400     | 1-2 days           |
+| Large  | 400+          | Consider splitting |
 
 ## Reporting Issues
 
