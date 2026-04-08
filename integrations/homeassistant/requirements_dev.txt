@@ -5,7 +5,7 @@
 ruff==0.8.4
 mypy==1.13.0
 bandit[toml]==1.8.0
-pytest-cov==6.0.0
+pytest-cov==7.1.0
 pytest-asyncio==0.24.0
 # homeassistant is installed for its type stubs — mypy strict on the custom
 # component needs to see ConfigFlow, HomeAssistant, and the helpers modules
