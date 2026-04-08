@@ -33,12 +33,10 @@ cd "$REPO_ROOT"
 
 STATUS=0
 RED=$'\033[0;31m'
-YELLOW=$'\033[0;33m'
 GREEN=$'\033[0;32m'
 NC=$'\033[0m'
 
 log_err() { printf "%sERROR%s %s\n" "$RED" "$NC" "$*" >&2; STATUS=1; }
-log_warn() { printf "%sWARN%s  %s\n" "$YELLOW" "$NC" "$*" >&2; }
 log_ok() { printf "%sOK%s    %s\n" "$GREEN" "$NC" "$*"; }
 
 # ── Tier 1: allowlist by exact repo URL (lowercased for comparison) ─────

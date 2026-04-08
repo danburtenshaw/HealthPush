@@ -4,156 +4,156 @@
 
 # ── Type ──────────────────────────────────────────────────────────
 - name: bug
-  color: d73a4a
+  color: "d73a4a"
   description: Something isn't working
 - name: feature
-  color: a2eeef
+  color: "a2eeef"
   description: New functionality
 - name: enhancement
-  color: a2eeef
+  color: "a2eeef"
   description: Improvement to existing functionality
 - name: refactor
-  color: cfd3d7
+  color: "cfd3d7"
   description: Code refactor with no user-visible change
 - name: docs
-  color: 0075ca
+  color: "0075ca"
   description: Documentation changes
 - name: test
-  color: d4c5f9
+  color: "d4c5f9"
   description: Test-only changes
 - name: chore
-  color: ededed
+  color: "ededed"
   description: Routine maintenance
 - name: ci
-  color: 000000
+  color: "000000"
   description: CI/CD pipeline changes
 - name: security
-  color: b60205
+  color: "b60205"
   description: Security-related
 - name: performance
-  color: fbca04
+  color: "fbca04"
   description: Performance improvement or regression
 
 # ── Scope ─────────────────────────────────────────────────────────
 - name: "scope: ios"
-  color: 1d76db
+  color: "1d76db"
   description: iOS app
 - name: "scope: ha"
-  color: 1d76db
+  color: "1d76db"
   description: Home Assistant integration
 - name: "scope: storage-core"
-  color: 1d76db
+  color: "1d76db"
   description: packages/HealthPushStorageCore
 - name: "scope: destinations"
-  color: 1d76db
+  color: "1d76db"
   description: Sync destination abstraction or implementations
 - name: "scope: sync"
-  color: 1d76db
+  color: "1d76db"
   description: SyncEngine, scheduling, background tasks
 - name: "scope: docs"
-  color: 1d76db
+  color: "1d76db"
   description: User or contributor docs
 - name: "scope: release"
-  color: 1d76db
+  color: "1d76db"
   description: Fastlane, release-please, versioning
 
 # ── Priority ──────────────────────────────────────────────────────
 - name: "priority: critical"
-  color: b60205
+  color: "b60205"
   description: Blocks release or causes data loss
 - name: "priority: high"
-  color: d93f0b
+  color: "d93f0b"
   description: Important, schedule soon
 - name: "priority: medium"
-  color: fbca04
+  color: "fbca04"
   description: Normal priority
 - name: "priority: low"
-  color: 0e8a16
+  color: "0e8a16"
   description: Nice to have
 
 # ── Status ────────────────────────────────────────────────────────
 - name: triage
-  color: ededed
+  color: "ededed"
   description: Needs maintainer triage
 - name: "needs-repro"
-  color: ededed
+  color: "ededed"
   description: Waiting for reproduction steps
 - name: "needs-info"
-  color: ededed
+  color: "ededed"
   description: Waiting for additional information
 - name: "needs-design"
-  color: ededed
+  color: "ededed"
   description: Requires design discussion
 - name: blocked
-  color: b60205
+  color: "b60205"
   description: Blocked on an external dependency
 - name: wontfix
-  color: ffffff
+  color: "ffffff"
   description: This will not be worked on
 - name: duplicate
-  color: cfd3d7
+  color: "cfd3d7"
   description: This issue or PR already exists
 - name: invalid
-  color: e4e669
+  color: "e4e669"
   description: This doesn't seem right
 - name: "good first issue"
-  color: 7057ff
+  color: "7057ff"
   description: Good for newcomers
 - name: "help wanted"
-  color: 008672
+  color: "008672"
   description: Extra attention is needed
 
 # ── Release train ─────────────────────────────────────────────────
 - name: "release: ios"
-  color: 006b75
+  color: "006b75"
   description: Part of the iOS release train
 - name: "release: ha"
-  color: 006b75
+  color: "006b75"
   description: Part of the Home Assistant release train
 - name: "release: storage-core"
-  color: 006b75
+  color: "006b75"
   description: Part of the storage-core release train
 
 # ── Destination proposals ────────────────────────────────────────
 - name: "destination: proposed"
-  color: bfd4f2
+  color: "bfd4f2"
   description: A new destination is proposed but not yet accepted
 - name: "destination: accepted"
-  color: 0e8a16
+  color: "0e8a16"
   description: A new destination is accepted for implementation
 - name: "destination: s3"
-  color: c5def5
+  color: "c5def5"
 - name: "destination: homeassistant"
-  color: c5def5
+  color: "c5def5"
 - name: "destination: rest"
-  color: c5def5
+  color: "c5def5"
 - name: "destination: google-drive"
-  color: c5def5
+  color: "c5def5"
 - name: "destination: google-sheets"
-  color: c5def5
+  color: "c5def5"
 - name: "destination: mqtt"
-  color: c5def5
+  color: "c5def5"
 - name: "destination: webdav"
-  color: c5def5
+  color: "c5def5"
 - name: "destination: csv"
-  color: c5def5
+  color: "c5def5"
 
 # ── Automation ────────────────────────────────────────────────────
 - name: dependencies
-  color: 0366d6
+  color: "0366d6"
   description: Dependency updates
 - name: python
-  color: 0366d6
+  color: "0366d6"
   description: Python dependency
 - name: swift
-  color: 0366d6
+  color: "0366d6"
   description: Swift dependency
 - name: ruby
-  color: 0366d6
+  color: "0366d6"
   description: Ruby dependency
 - name: "ai-review"
-  color: 5319e7
+  color: "5319e7"
   description: Trigger full AI code review
 - name: automerge
-  color: 0e8a16
+  color: "0e8a16"
   description: Merge when all checks pass
