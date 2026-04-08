@@ -77,6 +77,10 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -o pipefail
+          # ARCHS=arm64 + ONLY_ACTIVE_ARCH=YES skip the x86_64 Rosetta slice
+          # that `generic/platform=iOS Simulator` would otherwise pull in on
+          # Apple Silicon runners. ~3-4x faster and matches what the test job
+          # actually runs against.
           xcodebuild build \
             -project HealthPush.xcodeproj \
             -scheme "$SCHEME" \
@@ -84,6 +88,8 @@ jobs:
             -destination "$BUILD_DESTINATION" \
             -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm-cache" \
             -skipPackagePluginValidation \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO 2>&1 | xcbeautify --renderer github-actions
@@ -100,6 +106,8 @@ jobs:
             -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm-cache" \
             -skipPackagePluginValidation \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO 2>&1 | xcbeautify --renderer github-actions

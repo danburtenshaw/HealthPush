@@ -81,12 +81,17 @@ jobs:
           DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
         run: |
           set -o pipefail
+          # ARCHS=arm64 + ONLY_ACTIVE_ARCH=YES prevent the runner from
+          # compiling an x86_64 slice under Rosetta, which is ~3-4x slower
+          # than native on Apple Silicon and adds 10+ minutes to the analysis.
           xcodebuild build \
             -project HealthPush.xcodeproj \
             -scheme HealthPush \
             -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
             -skipPackagePluginValidation \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
