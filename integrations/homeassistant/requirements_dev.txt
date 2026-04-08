@@ -13,4 +13,4 @@ pytest-asyncio==0.24.0
 # pytest-homeassistant-custom-component is intentionally *not* pinned: its
 # transitive acme/josepy pins conflict at import time. Add it back alongside
 # a matching HA version when tests start using its fixtures.
-homeassistant>=2026.4.1
+homeassistant>=2026.1.3
