@@ -4,7 +4,7 @@ import os
 // MARK: - NetworkError
 
 /// Errors that can occur during network operations.
-enum NetworkError: LocalizedError, Sendable {
+enum NetworkError: LocalizedError {
     case invalidURL(String)
     case invalidResponse
     case httpError(statusCode: Int, body: String?)
@@ -15,18 +15,18 @@ enum NetworkError: LocalizedError, Sendable {
 
     var errorDescription: String? {
         switch self {
-        case .invalidURL(let url):
+        case let .invalidURL(url):
             return "Invalid URL: \(url)"
         case .invalidResponse:
             return "The server returned an invalid response."
-        case .httpError(let statusCode, let body):
+        case let .httpError(statusCode, body):
             let bodyInfo = body.map { ": \($0)" } ?? ""
             return "HTTP error \(statusCode)\(bodyInfo)"
-        case .encodingFailed(let message):
+        case let .encodingFailed(message):
             return "Failed to encode request: \(message)"
-        case .decodingFailed(let message):
+        case let .decodingFailed(message):
             return "Failed to decode response: \(message)"
-        case .connectionFailed(let message):
+        case let .connectionFailed(message):
             return "Connection failed: \(message)"
         case .timeout:
             return "The request timed out."
@@ -37,7 +37,7 @@ enum NetworkError: LocalizedError, Sendable {
 // MARK: - HTTPMethod
 
 /// Supported HTTP methods.
-enum HTTPMethod: String, Sendable {
+enum HTTPMethod: String {
     case get = "GET"
     case post = "POST"
     case put = "PUT"
@@ -50,8 +50,7 @@ enum HTTPMethod: String, Sendable {
 ///
 /// This service handles JSON encoding/decoding, authentication headers,
 /// and error mapping. It uses no third-party dependencies.
-struct NetworkService: Sendable {
-
+struct NetworkService {
     // MARK: Properties
 
     private let session: URLSession
@@ -64,7 +63,7 @@ struct NetworkService: Sendable {
     init(configuration: URLSessionConfiguration = .default) {
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 60
-        self.session = URLSession(configuration: configuration)
+        session = URLSession(configuration: configuration)
     }
 
     // MARK: Request Methods
@@ -226,7 +225,8 @@ struct NetworkService: Sendable {
             switch error.code {
             case .timedOut:
                 throw NetworkError.timeout
-            case .notConnectedToInternet, .networkConnectionLost:
+            case .notConnectedToInternet,
+                 .networkConnectionLost:
                 throw NetworkError.connectionFailed("No internet connection.")
             default:
                 throw NetworkError.connectionFailed(error.localizedDescription)

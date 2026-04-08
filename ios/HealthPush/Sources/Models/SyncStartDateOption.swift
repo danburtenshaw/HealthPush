@@ -1,7 +1,7 @@
 import Foundation
 
 /// Configurable sync window — how far back to pull health data for the initial full sync.
-enum SyncStartDateOption: String, CaseIterable, Codable, Sendable, Identifiable {
+enum SyncStartDateOption: String, CaseIterable, Codable, Identifiable {
     case today
     case yesterday
     case last7Days
@@ -10,17 +10,19 @@ enum SyncStartDateOption: String, CaseIterable, Codable, Sendable, Identifiable 
     case lastYear
     case custom
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var displayName: String {
         switch self {
-        case .today: return "Today"
-        case .yesterday: return "Yesterday"
-        case .last7Days: return "Last 7 Days"
-        case .last30Days: return "Last 30 Days"
-        case .last90Days: return "Last 90 Days"
-        case .lastYear: return "Last Year"
-        case .custom: return "Custom Date"
+        case .today: "Today"
+        case .yesterday: "Yesterday"
+        case .last7Days: "Last 7 Days"
+        case .last30Days: "Last 30 Days"
+        case .last90Days: "Last 90 Days"
+        case .lastYear: "Last Year"
+        case .custom: "Custom Date"
         }
     }
 
@@ -28,21 +30,22 @@ enum SyncStartDateOption: String, CaseIterable, Codable, Sendable, Identifiable 
     /// - Parameter customDate: The user-chosen date (only used when `self == .custom`).
     func resolvedDate(customDate: Date? = nil) -> Date {
         let calendar = Calendar.current
+        let now = Date.now
         switch self {
         case .today:
-            return calendar.startOfDay(for: .now)
+            return calendar.startOfDay(for: now)
         case .yesterday:
-            return calendar.startOfDay(for: calendar.date(byAdding: .day, value: -1, to: .now)!)
+            return calendar.startOfDay(for: now.daysAgo(1, calendar: calendar))
         case .last7Days:
-            return calendar.startOfDay(for: calendar.date(byAdding: .day, value: -7, to: .now)!)
+            return calendar.startOfDay(for: now.daysAgo(7, calendar: calendar))
         case .last30Days:
-            return calendar.startOfDay(for: calendar.date(byAdding: .day, value: -30, to: .now)!)
+            return calendar.startOfDay(for: now.daysAgo(30, calendar: calendar))
         case .last90Days:
-            return calendar.startOfDay(for: calendar.date(byAdding: .day, value: -90, to: .now)!)
+            return calendar.startOfDay(for: now.daysAgo(90, calendar: calendar))
         case .lastYear:
-            return calendar.startOfDay(for: calendar.date(byAdding: .year, value: -1, to: .now)!)
+            return calendar.startOfDay(for: now.yearsAgo(1, calendar: calendar))
         case .custom:
-            return calendar.startOfDay(for: customDate ?? .now)
+            return calendar.startOfDay(for: customDate ?? now)
         }
     }
 }

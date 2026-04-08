@@ -1,0 +1,135 @@
+name: Lint & Guards
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Repo-wide invariants that must never regress ───────────────────
+  repo-guards:
+    name: Repo guards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: No third-party Swift dependencies
+        run: scripts/check-no-third-party-deps.sh
+
+      - name: No stray print() in production Swift code
+        run: |
+          set -e
+          if grep -rn --include='*.swift' \
+            --exclude-dir=Tests \
+            --exclude-dir=.build \
+            --exclude-dir=DerivedData \
+            -E '^[^/]*\bprint\(' ios/HealthPush/Sources packages 2>/dev/null \
+            | grep -v "^[^:]*:[^:]*:[[:space:]]*//"; then
+            echo "::error::Found print() calls in production Swift code — use os.Logger instead."
+            exit 1
+          fi
+          echo "OK: no stray print() calls"
+
+      - name: No NSLog or os_log-legacy calls
+        run: |
+          set -e
+          if grep -rn --include='*.swift' \
+            --exclude-dir=Tests \
+            --exclude-dir=.build \
+            -E '\b(NSLog|os_log)\(' ios/HealthPush/Sources packages 2>/dev/null; then
+            echo "::error::Found NSLog/os_log — use os.Logger API instead."
+            exit 1
+          fi
+          echo "OK: no legacy logging APIs"
+
+      - name: No force-try or force-as
+        run: |
+          set -e
+          if grep -rn --include='*.swift' \
+            --exclude-dir=Tests \
+            --exclude-dir=.build \
+            -E 'try!|as![^?]' ios/HealthPush/Sources packages 2>/dev/null; then
+            echo "::error::Found try! or as! in production Swift code."
+            exit 1
+          fi
+          echo "OK: no force-try or force-as"
+
+      - name: No empty catch blocks
+        run: |
+          set -e
+          if grep -rPzn --include='*.swift' \
+            --exclude-dir=Tests \
+            --exclude-dir=.build \
+            '(?s)catch[[:space:]]*\{[[:space:]]*\}' ios/HealthPush/Sources packages 2>/dev/null; then
+            echo "::error::Found empty catch blocks."
+            exit 1
+          fi
+          echo "OK: no empty catch blocks"
+
+      - name: Gitleaks (secrets scan)
+        uses: gitleaks/gitleaks-action@83373cf2f8c4db6e24b41c1a9b086bb9619e9cd3 # v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Markdown lint ──────────────────────────────────────────────────
+  markdown-lint:
+    name: Markdown lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@05f32210e84442804257b2a6f20b273450ec8265 # v19.1.0
+        with:
+          globs: |
+            **/*.md
+            **/*.mdx
+            !.local/**
+            !**/CHANGELOG.md
+            !**/node_modules/**
+
+  # ── YAML lint ──────────────────────────────────────────────────────
+  yaml-lint:
+    name: YAML lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: yamllint
+        uses: karancode/yamllint-github-action@4052d365f09b8d34eb552c363d1141fd60e2aeb2 # master
+        with:
+          yamllint_strict: false
+          yamllint_comment: false
+          yamllint_config_filepath: ".yamllint.yaml"
+
+  # ── Shell lint ─────────────────────────────────────────────────────
+  shell-lint:
+    name: Shell lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: shellcheck
+        uses: ludeeus/action-shellcheck@00b27aa7cb85167568cb48a3838b75f4265f2bca # master
+        env:
+          SHELLCHECK_OPTS: "-e SC1091"
+        with:
+          scandir: "./scripts"

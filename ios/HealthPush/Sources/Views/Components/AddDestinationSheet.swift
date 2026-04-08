@@ -8,7 +8,6 @@ import SwiftUI
 /// follows Apple HIG: clear title, descriptive rows, and predictable
 /// bottom-sheet presentation on all device sizes.
 struct AddDestinationSheet: View {
-
     // MARK: Properties
 
     /// Called when the user selects a destination type to add.
@@ -94,18 +93,18 @@ struct AddDestinationSheet: View {
     private func subtitle(for type: DestinationType) -> String {
         switch type {
         case .s3:
-            return "AWS S3 or any S3-compatible bucket"
+            "AWS S3 or any S3-compatible bucket"
         case .homeAssistant:
-            return "Push sensors to your HA instance"
+            "Push sensors to your HA instance"
         }
     }
 
     private func iconColor(for type: DestinationType) -> Color {
         switch type {
         case .s3:
-            return .orange
+            .orange
         case .homeAssistant:
-            return .blue
+            .blue
         }
     }
 }
@@ -115,8 +114,6 @@ struct AddDestinationSheet: View {
 #Preview {
     Text("Background")
         .sheet(isPresented: .constant(true)) {
-            AddDestinationSheet { type in
-                print("Selected \(type.displayName)")
-            }
+            AddDestinationSheet { _ in }
         }
 }

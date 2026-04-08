@@ -1,0 +1,10 @@
+# HealthPush Home Assistant integration — dev tooling
+# Keep in sync with pyproject.toml configuration.
+# Install: pip install -r requirements_dev.txt -r requirements_test.txt
+
+ruff==0.8.4
+mypy==1.13.0
+bandit[toml]==1.8.0
+pytest-cov==6.0.0
+pytest-asyncio==0.24.0
+pytest-homeassistant-custom-component==0.13.184

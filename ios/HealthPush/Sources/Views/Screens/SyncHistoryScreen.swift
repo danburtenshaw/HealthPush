@@ -1,11 +1,10 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - SyncHistoryScreen
 
 /// Screen displaying a chronological log of past sync operations with status, counts, and errors.
 struct SyncHistoryScreen: View {
-
     // MARK: Properties
 
     @Environment(\.dismiss) private var dismiss
@@ -44,8 +43,8 @@ struct SyncHistoryScreen: View {
                         }
                     } label: {
                         Image(systemName: selectedFilter == .all
-                              ? "line.3.horizontal.decrease.circle"
-                              : "line.3.horizontal.decrease.circle.fill"
+                            ? "line.3.horizontal.decrease.circle"
+                            : "line.3.horizontal.decrease.circle.fill"
                         )
                     }
                     .accessibilityLabel("Filter")
@@ -88,13 +87,13 @@ struct SyncHistoryScreen: View {
     private var filteredRecords: [SyncRecord] {
         switch selectedFilter {
         case .all:
-            return syncRecords
+            syncRecords
         case .success:
-            return syncRecords.filter { $0.status == .success }
+            syncRecords.filter { $0.status == .success }
         case .failed:
-            return syncRecords.filter { $0.status == .failure || $0.status == .partialFailure }
+            syncRecords.filter { $0.status == .failure || $0.status == .partialFailure }
         case .background:
-            return syncRecords.filter(\.isBackgroundSync)
+            syncRecords.filter(\.isBackgroundSync)
         }
     }
 
@@ -110,7 +109,8 @@ struct SyncHistoryScreen: View {
         return grouped
             .sorted { lhs, rhs in
                 guard let lhsDate = lhs.value.first?.timestamp,
-                      let rhsDate = rhs.value.first?.timestamp else {
+                      let rhsDate = rhs.value.first?.timestamp
+                else {
                     return false
                 }
                 return lhsDate > rhsDate
@@ -126,23 +126,25 @@ private enum SyncHistoryFilter: String, CaseIterable, Identifiable {
     case failed
     case background
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var displayName: String {
         switch self {
-        case .all: return "All"
-        case .success: return "Successful"
-        case .failed: return "Failed"
-        case .background: return "Background"
+        case .all: "All"
+        case .success: "Successful"
+        case .failed: "Failed"
+        case .background: "Background"
         }
     }
 
     var icon: String {
         switch self {
-        case .all: return "list.bullet"
-        case .success: return "checkmark.circle"
-        case .failed: return "xmark.circle"
-        case .background: return "moon.fill"
+        case .all: "list.bullet"
+        case .success: "checkmark.circle"
+        case .failed: "xmark.circle"
+        case .background: "moon.fill"
         }
     }
 }
@@ -150,7 +152,6 @@ private enum SyncHistoryFilter: String, CaseIterable, Identifiable {
 // MARK: - SyncRecordRow
 
 private struct SyncRecordRow: View {
-
     let record: SyncRecord
 
     @State private var isExpanded = false
@@ -244,10 +245,10 @@ private struct SyncRecordRow: View {
 
     private var statusAccessibilityDescription: String {
         switch record.status {
-        case .success: return "successful"
-        case .partialFailure: return "partially failed"
-        case .failure: return "failed"
-        case .inProgress: return "in progress"
+        case .success: "successful"
+        case .partialFailure: "partially failed"
+        case .failure: "failed"
+        case .inProgress: "in progress"
         }
     }
 
@@ -260,19 +261,19 @@ private struct SyncRecordRow: View {
 
     private var iconName: String {
         switch record.status {
-        case .success: return "checkmark.circle.fill"
-        case .partialFailure: return "exclamationmark.circle.fill"
-        case .failure: return "xmark.circle.fill"
-        case .inProgress: return "arrow.triangle.2.circlepath"
+        case .success: "checkmark.circle.fill"
+        case .partialFailure: "exclamationmark.circle.fill"
+        case .failure: "xmark.circle.fill"
+        case .inProgress: "arrow.triangle.2.circlepath"
         }
     }
 
     private var iconColor: Color {
         switch record.status {
-        case .success: return .green
-        case .partialFailure: return .orange
-        case .failure: return .red
-        case .inProgress: return .blue
+        case .success: .green
+        case .partialFailure: .orange
+        case .failure: .red
+        case .inProgress: .blue
         }
     }
 

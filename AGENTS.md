@@ -17,7 +17,7 @@ Home Assistant is the first major integration, but the broader product direction
 ### Long-Term Vision
 - Build the open-source standard for exporting Apple Health data to user-controlled destinations.
 - Support multiple destination types without making any single integration the architectural center of the app.
-- Keep the app understandable and auditable: the iOS client should avoid third-party dependencies unless there is a very strong reason.
+- Keep the app understandable and auditable: follow the tiered dependency policy in `docs/dependencies.md`. The iOS app target stays at zero SPM deps; internal packages under `packages/` may use only allowlisted Apple-stewarded libraries.
 - Preserve direct data flow from device to destination whenever feasible. Avoid introducing HealthPush-operated infrastructure.
 
 ### MVP Positioning
@@ -69,7 +69,7 @@ HealthPush/
 - **Health**: HealthKit framework
 - **Background**: BGTaskScheduler for automated syncs
 - **Storage**: SwiftData for local persistence
-- **Networking**: URLSession (no third-party deps)
+- **Networking**: URLSession — see dependency policy in Architecture Principles #2
 - **Project**: XcodeGen (`project.yml` generates `.xcodeproj`)
 
 ### Home Assistant Integration
@@ -85,7 +85,7 @@ HealthPush/
 ## Architecture Principles
 
 1. **Destination-first abstraction** — All sync targets implement `SyncDestination`. Core flows should remain destination-agnostic.
-2. **No third-party dependencies in the iOS app** — Keep the supply chain minimal for security, trust, and auditability.
+2. **Minimal, tiered, audited dependencies** — The iOS app target ships with **zero** third-party SPM dependencies. Internal packages under `packages/` may use only (a) Apple system frameworks, (b) Apple-stewarded Swift Server Workgroup packages (`swift-crypto`, `swift-asn1`, etc.) allowlisted by name, and (c) specific security-critical libraries with strong pedigree (currently none; `AppAuth-iOS` is planned for post-1.0 Google destinations). Every dependency is pinned, covered by Dependabot, listed in the release SBOM, and audited by the `privacy-reviewer` subagent on introduction. Analytics, telemetry, crash reporters, convenience libraries, and test frameworks beyond XCTest/Swift Testing are forbidden. Enforced by `scripts/check-no-third-party-deps.sh` in CI. See `docs/dependencies.md` for the current allowlist and the process for adding a new dep.
 3. **Background-first** — The app is designed to run unattended. BGTaskScheduler handles periodic syncs.
 4. **Privacy-first** — Health data never leaves the device except to destinations the user explicitly configures.
 5. **Local-first** — All configuration is stored on-device via SwiftData.

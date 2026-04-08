@@ -9,10 +9,19 @@
 
 <p align="center">
   <a href="https://github.com/danburtenshaw/HealthPush/actions/workflows/ios-ci.yml"><img src="https://github.com/danburtenshaw/HealthPush/actions/workflows/ios-ci.yml/badge.svg" alt="iOS CI"></a>
+  <a href="https://github.com/danburtenshaw/HealthPush/actions/workflows/ha-integration-ci.yml"><img src="https://github.com/danburtenshaw/HealthPush/actions/workflows/ha-integration-ci.yml/badge.svg" alt="HA CI"></a>
+  <a href="https://github.com/danburtenshaw/HealthPush/actions/workflows/s3-core-ci.yml"><img src="https://github.com/danburtenshaw/HealthPush/actions/workflows/s3-core-ci.yml/badge.svg" alt="S3 Core CI"></a>
+  <a href="https://github.com/danburtenshaw/HealthPush/actions/workflows/codeql.yml"><img src="https://github.com/danburtenshaw/HealthPush/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
+  <a href="https://github.com/danburtenshaw/HealthPush/actions/workflows/lint.yml"><img src="https://github.com/danburtenshaw/HealthPush/actions/workflows/lint.yml/badge.svg" alt="Lint & Guards"></a>
+  <a href="https://securityscorecards.dev/viewer/?uri=github.com/danburtenshaw/HealthPush"><img src="https://api.securityscorecards.dev/projects/github.com/danburtenshaw/HealthPush/badge" alt="OSSF Scorecard"></a>
+</p>
+
+<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/platform-iOS_17%2B-black.svg?logo=apple" alt="Platform: iOS 17+">
   <img src="https://img.shields.io/badge/Swift-6.0-F05138.svg?logo=swift&logoColor=white" alt="Swift 6.0">
   <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-compatible-41BDF5.svg" alt="HACS"></a>
+  <a href="https://conventionalcommits.org"><img src="https://img.shields.io/badge/Conventional_Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white" alt="Conventional Commits"></a>
 </p>
 
 <p align="center">

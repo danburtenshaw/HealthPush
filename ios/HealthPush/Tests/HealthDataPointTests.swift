@@ -1,12 +1,10 @@
-import Testing
 import Foundation
+import Testing
 @testable import HealthPush
 
 // MARK: - HealthDataPointTests
 
-@Suite("HealthDataPoint")
 struct HealthDataPointTests {
-
     // MARK: Initialization
 
     @Test("Creates a data point with all properties")
@@ -62,8 +60,8 @@ struct HealthDataPointTests {
             metricType: .heartRate,
             value: 72.5,
             unit: "bpm",
-            timestamp: Date(timeIntervalSince1970: 1700000000),
-            endTimestamp: Date(timeIntervalSince1970: 1700000060),
+            timestamp: Date(timeIntervalSince1970: 1_700_000_000),
+            endTimestamp: Date(timeIntervalSince1970: 1_700_000_060),
             sourceName: "Apple Watch",
             sourceBundleIdentifier: "com.apple.health",
             categoryValue: 4
@@ -137,18 +135,17 @@ struct HealthDataPointTests {
     }
 
     @Test("aggregateID has correct UUID version 5 bits")
-    func aggregateIDVersionBits() {
+    func aggregateIDVersionBits() throws {
         let id = HealthDataPoint.aggregateID(date: "2026-04-05", metric: .steps)
         let uuidString = id.uuidString
         // Version nibble is character at index 14 (0-indexed in the hyphen-stripped form)
         // In UUID string format: xxxxxxxx-xxxx-Vxxx-Nxxx-xxxxxxxxxxxx
         // V should be 5, N should be 8, 9, a, or b
         let parts = uuidString.split(separator: "-")
-        let versionChar = parts[2].first!
+        let versionChar = try #require(parts[2].first)
         #expect(versionChar == "5")
 
-        let variantChar = parts[3].first!
+        let variantChar = try #require(parts[3].first)
         #expect("89AB".contains(variantChar.uppercased()))
     }
-
 }

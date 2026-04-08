@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - SetupMode
 
@@ -10,8 +10,8 @@ enum SetupMode: Identifiable {
 
     var id: String {
         switch self {
-        case .create: return "create"
-        case .edit(let config): return config.id.uuidString
+        case .create: "create"
+        case let .edit(config): config.id.uuidString
         }
     }
 }
@@ -23,7 +23,6 @@ enum SetupMode: Identifiable {
 /// Provides fields for the HA webhook URL and optional webhook secret, a connection
 /// test button with visual feedback, and a metric picker.
 struct HomeAssistantSetupScreen: View {
-
     // MARK: Properties
 
     let mode: SetupMode
@@ -34,19 +33,19 @@ struct HomeAssistantSetupScreen: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    @State private var name: String = "Home Assistant"
-    @State private var baseURL: String = ""
-    @State private var apiToken: String = ""
-    @State private var hasStoredSecret: Bool = false
-    @State private var removeStoredSecret: Bool = false
+    @State private var name = "Home Assistant"
+    @State private var baseURL = ""
+    @State private var apiToken = ""
+    @State private var hasStoredSecret = false
+    @State private var removeStoredSecret = false
     @State private var enabledMetrics: Set<HealthMetricType> = Set(HealthMetricType.allCases)
     @State private var syncFrequency: SyncFrequency = .oneHour
-    @State private var isEnabled: Bool = true
+    @State private var isEnabled = true
 
-    @State private var isTesting: Bool = false
+    @State private var isTesting = false
     @State private var testResult: ConnectionTestResult?
-    @State private var showingMetricPicker: Bool = false
-    @State private var showingDeleteConfirmation: Bool = false
+    @State private var showingMetricPicker = false
+    @State private var showingDeleteConfirmation = false
 
     // MARK: Body
 
@@ -82,7 +81,7 @@ struct HomeAssistantSetupScreen: View {
             }
             .alert("Delete Destination", isPresented: $showingDeleteConfirmation) {
                 Button("Delete", role: .destructive) { deleteDestination() }
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel", role: .cancel) { }
             } message: {
                 Text("This will permanently remove this destination and stop all syncing to it.")
             }
@@ -119,10 +118,10 @@ struct HomeAssistantSetupScreen: View {
                     hasStoredSecret && apiToken.isEmpty ? "Saved in Keychain" : "Webhook secret (optional)",
                     text: $apiToken
                 )
-                    .multilineTextAlignment(.trailing)
-                    .textContentType(.password)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+                .multilineTextAlignment(.trailing)
+                .textContentType(.password)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
             } label: {
                 Label("Secret", systemImage: "lock.fill")
             }
@@ -237,7 +236,7 @@ struct HomeAssistantSetupScreen: View {
         case .success:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
-        case .failure(let message):
+        case let .failure(message):
             HStack(spacing: 4) {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.red)
@@ -257,7 +256,7 @@ struct HomeAssistantSetupScreen: View {
             switch testResult {
             case .success:
                 return "Test Connection, passed"
-            case .failure(let message):
+            case let .failure(message):
                 return "Test Connection, failed: \(message)"
             }
         }
@@ -271,14 +270,14 @@ struct HomeAssistantSetupScreen: View {
 
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
-        && !baseURL.trimmingCharacters(in: .whitespaces).isEmpty
-        && !enabledMetrics.isEmpty
+            && !baseURL.trimmingCharacters(in: .whitespaces).isEmpty
+            && !enabledMetrics.isEmpty
     }
 
     // MARK: Data Loading
 
     private func loadExistingConfig() {
-        guard case .edit(let config) = mode else { return }
+        guard case let .edit(config) = mode else { return }
         name = config.name
         baseURL = config.baseURL
         apiToken = ""
@@ -308,7 +307,7 @@ struct HomeAssistantSetupScreen: View {
                     modelContext: modelContext
                 )
 
-            case .edit(let config):
+            case let .edit(config):
                 config.name = trimmedName
                 config.baseURL = trimmedURL
                 if removeStoredSecret && trimmedToken.isEmpty {
@@ -339,7 +338,7 @@ struct HomeAssistantSetupScreen: View {
     }
 
     private func deleteDestination() {
-        guard case .edit(let config) = mode else { return }
+        guard case let .edit(config) = mode else { return }
         do {
             try destinationManager.deleteDestination(config, modelContext: modelContext)
         } catch {
@@ -353,13 +352,12 @@ struct HomeAssistantSetupScreen: View {
         isTesting = true
         testResult = nil
 
-        let effectiveToken: String
-        if !apiToken.trimmingCharacters(in: .whitespaces).isEmpty {
-            effectiveToken = apiToken.trimmingCharacters(in: .whitespaces)
-        } else if case .edit(let config) = mode, !removeStoredSecret {
-            effectiveToken = (try? config.resolvedAPIToken) ?? ""
+        let effectiveToken: String = if !apiToken.trimmingCharacters(in: .whitespaces).isEmpty {
+            apiToken.trimmingCharacters(in: .whitespaces)
+        } else if case let .edit(config) = mode, !removeStoredSecret {
+            (try? config.resolvedAPIToken) ?? ""
         } else {
-            effectiveToken = ""
+            ""
         }
 
         let tempConfig = DestinationConfig(

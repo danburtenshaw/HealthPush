@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -8,7 +8,6 @@ import UIKit
 
 /// App settings screen with sync frequency, data retention, and about info.
 struct SettingsScreen: View {
-
     // MARK: Properties
 
     @Environment(AppState.self) private var appState
@@ -35,9 +34,11 @@ struct SettingsScreen: View {
             }
             .alert("Reset Sync Data", isPresented: $showingResetConfirmation) {
                 Button("Reset", role: .destructive) { resetSyncData() }
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel", role: .cancel) { }
             } message: {
-                Text("This will clear all sync history and HealthKit anchors, forcing a full re-sync. Your destination configurations will be preserved.")
+                Text(
+                    "This will clear all sync history and HealthKit anchors, forcing a full re-sync. Your destination configurations will be preserved."
+                )
             }
         }
     }
@@ -51,9 +52,18 @@ struct SettingsScreen: View {
                     .font(.subheadline.weight(.semibold))
 
                 VStack(alignment: .leading, spacing: 6) {
-                    bulletRow(icon: "applewatch", text: "HealthKit delivery — syncs when new health data arrives from Apple Watch or other sources")
-                    bulletRow(icon: "arrow.triangle.2.circlepath", text: "Scheduled refresh — iOS runs background tasks at system-optimal times")
-                    bulletRow(icon: "lock.shield", text: "Health data is encrypted when locked — syncs only run while the device is unlocked")
+                    bulletRow(
+                        icon: "applewatch",
+                        text: "HealthKit delivery — syncs when new health data arrives from Apple Watch or other sources"
+                    )
+                    bulletRow(
+                        icon: "arrow.triangle.2.circlepath",
+                        text: "Scheduled refresh — iOS runs background tasks at system-optimal times"
+                    )
+                    bulletRow(
+                        icon: "lock.shield",
+                        text: "Health data is encrypted when locked — syncs only run while the device is unlocked"
+                    )
                 }
             }
 
@@ -112,7 +122,9 @@ struct SettingsScreen: View {
         } header: {
             Text("HealthKit")
         } footer: {
-            Text("HealthPush needs permission to read your health data. To change which data types are shared, open the Health app and go to Sharing > Apps > HealthPush.")
+            Text(
+                "HealthPush needs permission to read your health data. To change which data types are shared, open the Health app and go to Sharing > Apps > HealthPush."
+            )
         }
     }
 

@@ -1,13 +1,11 @@
-import Testing
 import Foundation
 import HealthKit
+import Testing
 @testable import HealthPush
 
 // MARK: - HomeAssistantDestinationTests
 
-@Suite("HomeAssistantDestination")
 struct HomeAssistantDestinationTests {
-
     // MARK: Helpers
 
     private func makeConfig(
@@ -32,8 +30,8 @@ struct HomeAssistantDestinationTests {
             metricType: metricType,
             value: value,
             unit: metricType.unitString,
-            timestamp: Date(timeIntervalSince1970: 1700000000),
-            endTimestamp: Date(timeIntervalSince1970: 1700003600),
+            timestamp: Date(timeIntervalSince1970: 1_700_000_000),
+            endTimestamp: Date(timeIntervalSince1970: 1_700_003_600),
             sourceName: "Test Device"
         )
     }
@@ -92,7 +90,7 @@ struct HomeAssistantDestinationTests {
     }
 
     @Test("Test connection throws with empty URL")
-    func testConnectionEmptyURL() async {
+    func connectionEmptyURL() async {
         let config = makeConfig(baseURL: "")
 
         do {
@@ -113,7 +111,7 @@ struct HomeAssistantDestinationTests {
     // MARK: Error Types
 
     @Test("HomeAssistantError has localized descriptions")
-    func errorDescriptions() {
+    func errorDescriptions() throws {
         let errors: [HomeAssistantError] = [
             .invalidConfiguration("test"),
             .connectionFailed("test"),
@@ -123,7 +121,7 @@ struct HomeAssistantDestinationTests {
 
         for error in errors {
             #expect(error.errorDescription != nil)
-            #expect(!error.errorDescription!.isEmpty)
+            #expect(try !(#require(error.errorDescription?.isEmpty)))
         }
     }
 

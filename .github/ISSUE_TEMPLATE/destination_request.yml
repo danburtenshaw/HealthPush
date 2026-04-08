@@ -1,0 +1,106 @@
+name: Destination Request
+description: Propose a new sync destination (REST, Sheets, MQTT, WebDAV, etc.)
+title: "[Destination]: "
+labels: ["feature", "destination: proposed", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a new destination. HealthPush is designed to be destination-agnostic, but
+        each integration has to meet a few criteria before we take it on:
+
+        - **User-owned** — the user must be able to stand up the destination themselves. No HealthPush-operated relays.
+        - **Direct delivery** — the iOS app talks to the destination directly, without a middle service.
+        - **No third-party dependencies** unless the dependency is already allowlisted (see `docs/dependencies.md`). Ask before assuming we can add a library.
+        - **Testable in CI** — we can run a containerized or account-scoped fixture in GitHub Actions.
+
+        Please fill out this form so a maintainer can assess the proposal.
+
+  - type: input
+    id: destination-name
+    attributes:
+      label: Destination name
+      description: Short, user-facing name (e.g. "Google Sheets", "MQTT broker", "WebDAV").
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: What use case does this enable?
+      description: What kind of HealthPush user would configure this destination, and what do they do with the data?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: delivery
+    attributes:
+      label: Delivery style
+      options:
+        - HTTP API (REST / webhooks)
+        - Object / file storage
+        - Messaging / pub-sub (MQTT, etc.)
+        - Tabular / spreadsheet
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: auth
+    attributes:
+      label: Authentication model
+      description: How does the user authenticate — API token, OAuth2, service account, basic auth, TLS client cert?
+    validations:
+      required: true
+
+  - type: textarea
+    id: payload
+    attributes:
+      label: Payload format
+      description: What does a single record look like on the wire? Does the destination accept JSON / NDJSON / CSV / custom? Does it need batching, compression, or schema pre-registration?
+    validations:
+      required: true
+
+  - type: textarea
+    id: rate-limits
+    attributes:
+      label: Rate limits and quotas
+      description: Known rate limits, per-minute caps, or cost model.
+    validations:
+      required: false
+
+  - type: textarea
+    id: test-fixture
+    attributes:
+      label: CI test fixture
+      description: Can we run this destination in a Docker container or with a fixture account? What would that look like?
+    validations:
+      required: true
+
+  - type: textarea
+    id: deps
+    attributes:
+      label: Required dependencies
+      description: Would this destination need any third-party libraries (e.g. AppAuth-iOS for OAuth2, CocoaMQTT for MQTT)? If so, name them.
+    validations:
+      required: true
+
+  - type: textarea
+    id: priority
+    attributes:
+      label: Why now?
+      description: Why should this destination be prioritized over others?
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: criteria
+    attributes:
+      label: Acceptance criteria acknowledgement
+      options:
+        - label: This destination can be stood up by the user without a HealthPush-operated service.
+          required: true
+        - label: I have read `docs/adding-a-destination.md` (or `contributing.mdx`) to understand the protocol.
+          required: true
+        - label: I understand any new dependency must go through the tiered allowlist in `docs/dependencies.md`.
+          required: true

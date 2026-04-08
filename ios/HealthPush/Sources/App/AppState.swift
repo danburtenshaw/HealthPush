@@ -15,11 +15,10 @@ import UIKit
 @MainActor
 @Observable
 final class AppState {
-
     // MARK: Sync Status
 
     /// Whether a sync is currently in progress.
-    var isSyncing: Bool = false
+    var isSyncing = false
 
     /// Per-destination sync progress (0.0 to 1.0). Keyed by destination name.
     var syncProgress: [String: Double] = [:]
@@ -34,7 +33,7 @@ final class AppState {
     var lastError: String?
 
     /// Whether an error alert should be shown.
-    var showingError: Bool = false
+    var showingError = false
 
     // MARK: Timestamps
 
@@ -53,7 +52,8 @@ final class AppState {
         guard let next = nextSyncTime else { return false }
         // If we synced recently, we're not overdue regardless of the scheduled time
         if let lastSync = lastSyncTime,
-           Date.now.timeIntervalSince(lastSync) < syncFrequency.timeInterval * 1.5 {
+           Date.now.timeIntervalSince(lastSync) < syncFrequency.timeInterval * 1.5
+        {
             return false
         }
         return Date.now > next.addingTimeInterval(30 * 60)

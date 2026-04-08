@@ -1,7 +1,7 @@
 version: 2
 
 updates:
-  # Keep GitHub Actions up to date
+  # ── GitHub Actions ────────────────────────────────────────────────
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -9,21 +9,27 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "UTC"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "ci"
     commit-message:
       prefix: "ci"
     groups:
-      github-actions-non-major:
+      github-actions-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+      github-actions-minor:
+        applies-to: version-updates
         patterns:
           - "*"
         update-types:
           - "minor"
-          - "patch"
 
-  # Monitor Python dependencies for HA integration
+  # ── Python — HA integration dev + test deps ──────────────────────
   - package-ecosystem: "pip"
     directory: "/integrations/homeassistant"
     schedule:
@@ -31,14 +37,61 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "UTC"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "python"
+      - "scope: ha"
     commit-message:
       prefix: "deps"
+      prefix-development: "deps-dev"
+    groups:
+      python-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+      python-minor:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
 
-  # Keep Fastlane and Ruby release tooling up to date
+  # ── Swift Package Manager — HealthPushStorageCore ────────────────
+  # This directory's Package.swift is the only place HealthPush allows
+  # SPM deps. The `packages/HealthPushStorageCore/` path is enforced by
+  # scripts/check-no-third-party-deps.sh.
+  - package-ecosystem: "swift"
+    directory: "/packages/HealthPushStorageCore"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "swift"
+      - "scope: storage-core"
+    commit-message:
+      prefix: "deps"
+    groups:
+      swift-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+      swift-minor:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+
+  # ── Ruby — Fastlane toolchain ────────────────────────────────────
   - package-ecosystem: "bundler"
     directory: "/"
     schedule:
@@ -46,10 +99,23 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "UTC"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "ruby"
-      - "release"
+      - "scope: release"
     commit-message:
       prefix: "deps"
+    groups:
+      ruby-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+      ruby-minor:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"

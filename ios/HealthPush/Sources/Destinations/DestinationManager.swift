@@ -1,7 +1,7 @@
 import Foundation
 import Observation
-import SwiftData
 import os
+import SwiftData
 
 // MARK: - DestinationManagerError
 
@@ -11,10 +11,10 @@ enum DestinationManagerError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .secretStorageFailed(let message):
-            return "Failed to secure destination credentials: \(message)"
-        case .persistenceFailed(let message):
-            return "Failed to save destination changes: \(message)"
+        case let .secretStorageFailed(message):
+            "Failed to secure destination credentials: \(message)"
+        case let .persistenceFailed(message):
+            "Failed to save destination changes: \(message)"
         }
     }
 }
@@ -28,7 +28,6 @@ enum DestinationManagerError: LocalizedError {
 @MainActor
 @Observable
 final class DestinationManager {
-
     // MARK: Properties
 
     private let logger = Logger(subsystem: "app.healthpush", category: "DestinationManager")
@@ -42,14 +41,14 @@ final class DestinationManager {
     var onDestinationsChanged: (() -> Void)?
 
     /// Whether a connection test is in progress.
-    var isTesting: Bool = false
+    var isTesting = false
 
     /// The result of the last connection test.
     var lastTestResult: TestResult?
 
     // MARK: Test Result
 
-    enum TestResult: Sendable {
+    enum TestResult {
         case success
         case failure(String)
     }

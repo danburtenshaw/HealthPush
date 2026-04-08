@@ -11,7 +11,6 @@ import os
 /// - `BGProcessingTask`: heavier sync for larger data transfers.
 @MainActor
 final class BackgroundSyncScheduler: Sendable {
-
     // MARK: Constants
 
     static let refreshTaskIdentifier = "app.healthpush.sync.refresh"
@@ -41,7 +40,7 @@ final class BackgroundSyncScheduler: Sendable {
 
     static let shared = BackgroundSyncScheduler()
 
-    private init() {}
+    private init() { }
 
     // MARK: Registration
 
@@ -168,7 +167,7 @@ final class BackgroundSyncScheduler: Sendable {
 
         isSyncing = true
         let syncTask = Task {
-            return await syncHandler?() ?? false
+            await syncHandler?() ?? false
         }
 
         task.expirationHandler = {
@@ -194,7 +193,7 @@ final class BackgroundSyncScheduler: Sendable {
 
         isSyncing = true
         let syncTask = Task {
-            return await syncHandler?() ?? false
+            await syncHandler?() ?? false
         }
 
         task.expirationHandler = {

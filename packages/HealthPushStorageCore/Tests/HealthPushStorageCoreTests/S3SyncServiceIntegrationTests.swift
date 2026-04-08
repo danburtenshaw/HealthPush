@@ -1,9 +1,8 @@
-import Testing
 import Foundation
+import Testing
 @testable import HealthPushStorageCore
 
 @Suite(
-    "S3SyncServiceIntegration",
     .serialized,
     .enabled(
         if: ProcessInfo.processInfo.environment["MINIO_ENDPOINT"] != nil
@@ -16,7 +15,7 @@ import Foundation
 )
 struct S3SyncServiceIntegrationTests {
     @Test("MinIO connection test succeeds")
-    func testConnectionAgainstMinIO() async throws {
+    func connectionAgainstMinIO() async throws {
         let integration = minioIntegration()
         let service = makeService(integration: integration, pathPrefix: uniquePrefix("connection"))
 
@@ -67,8 +66,8 @@ struct S3SyncServiceIntegrationTests {
         let service = makeService(integration: integration, pathPrefix: prefix, exportFormat: .csv)
 
         let data = [
-            makePoint(id: UUID(), metricType: .steps, value: 4_321),
-            makePoint(id: UUID(), metricType: .steps, value: 5_678, minutesAfterStart: 30)
+            makePoint(id: UUID(), metricType: .steps, value: 4321),
+            makePoint(id: UUID(), metricType: .steps, value: 5678, minutesAfterStart: 30)
         ]
 
         let stats = try await service.sync(data: data)
@@ -82,7 +81,7 @@ struct S3SyncServiceIntegrationTests {
         )
 
         #expect(storedPoints.count == 2)
-        #expect(storedPoints.map(\.value).sorted() == [4_321, 5_678])
+        #expect(storedPoints.map(\.value).sorted() == [4321, 5678])
     }
 
     private func makeService(

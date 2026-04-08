@@ -1,0 +1,109 @@
+# HealthPush lefthook config — opt-in local hooks
+#
+# Install:
+#   brew install lefthook
+#   lefthook install
+#
+# Uninstall:
+#   lefthook uninstall
+#
+# Manual run (skips the git staging logic, runs against the whole repo):
+#   lefthook run pre-commit --all-files
+#
+# Tools the hooks expect on PATH (install what you actually use):
+#   brew install lefthook swiftformat swiftlint gitleaks shellcheck
+#   brew install markdownlint-cli ruff  # optional — only if you touch those files
+#
+# These hooks are advisory. CI re-runs everything in .github/workflows/lint.yml
+# on every push and pull request, so skipping a local hook is never a shortcut
+# past CI.
+
+min_version: 1.10.0
+
+# ── pre-commit: fast feedback on staged changes ────────────────────────
+pre-commit:
+  parallel: true
+  commands:
+    # Hard-stop: supply-chain guard. Runs whenever project.yml or any Swift
+    # package manifest is staged — very cheap, no need to skip.
+    no-third-party-deps:
+      tags: guards supply-chain
+      glob: "{ios/HealthPush/project.yml,packages/**/Package.swift,packages/**/Package.resolved}"
+      run: scripts/check-no-third-party-deps.sh
+      stage_fixed: false
+
+    # Swift formatter — auto-fixes on save; re-stages so the commit includes
+    # the reformat. swiftformat honors .swiftformat at the repo root.
+    swiftformat:
+      tags: swift format
+      glob: "*.swift"
+      run: swiftformat {staged_files}
+      stage_fixed: true
+
+    # Swift linter — warnings only. CI uses the same config.
+    swiftlint:
+      tags: swift lint
+      glob: "*.swift"
+      run: swiftlint lint --quiet --reporter emoji {staged_files}
+      stage_fixed: false
+
+    # Secret scan. Fails the commit if gitleaks finds anything.
+    gitleaks:
+      tags: guards security
+      run: gitleaks protect --staged --redact --no-banner
+
+    # Shell lint for anything under scripts/
+    shellcheck:
+      tags: shell lint
+      glob: "scripts/**/*.sh"
+      run: shellcheck {staged_files}
+
+    # Python lint + format for the HA integration.
+    ruff-check:
+      tags: python lint
+      glob: "integrations/homeassistant/**/*.py"
+      run: ruff check --fix {staged_files}
+      stage_fixed: true
+    ruff-format:
+      tags: python format
+      glob: "integrations/homeassistant/**/*.py"
+      run: ruff format {staged_files}
+      stage_fixed: true
+
+    # Markdown lint — skip .local/ and CHANGELOG which is generated.
+    markdownlint:
+      tags: docs lint
+      glob: "*.{md,mdx}"
+      exclude:
+        - ".local/**"
+        - "**/CHANGELOG.md"
+      run: markdownlint --config .markdownlint.json {staged_files}
+
+# ── commit-msg: block WIP commits with Conventional Commit format ──────
+# Intentionally lenient locally — CI is the source of truth via
+# .github/workflows/commitlint.yml (amannn/action-semantic-pull-request).
+# This local hook just warns if a commit subject obviously won't squash
+# into a valid PR title.
+commit-msg:
+  commands:
+    conventional-heads-up:
+      run: |
+        if head -1 "{1}" | grep -qE '^(feat|fix|docs|refactor|test|chore|ci|perf|build|security|revert)(\([a-z0-9,-]+\))?!?: [A-Z]'; then
+          exit 0
+        fi
+        echo "⚠  This commit subject doesn't match Conventional Commits."
+        echo "   Local commits are fine — but the PR title (which becomes the"
+        echo "   squash-merge commit on main) must match, or CI will fail."
+        echo "   See CONTRIBUTING.md 'Commit Messages — Conventional Commits'."
+        exit 0  # warn only
+
+# ── pre-push: one last check before it goes over the wire ─────────────
+pre-push:
+  commands:
+    no-third-party-deps:
+      tags: guards supply-chain
+      run: scripts/check-no-third-party-deps.sh
+
+skip_output:
+  - meta
+  - success

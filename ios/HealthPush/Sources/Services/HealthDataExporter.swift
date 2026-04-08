@@ -16,8 +16,7 @@ import os
 ///
 /// By centralising this logic, all destinations (S3, Google Sheets, local CSV, etc.)
 /// get consistent, tested behaviour without reimplementing dedup/merge.
-struct HealthDataExporter: Sendable {
-
+struct HealthDataExporter {
     #if canImport(os)
     private let logger = Logger(subsystem: "app.healthpush", category: "HealthDataExporter")
     #endif
@@ -57,7 +56,7 @@ struct HealthDataExporter: Sendable {
     // MARK: - Deduplication / Merge
 
     /// The result of merging existing and incoming data points.
-    struct MergeResult: Sendable {
+    struct MergeResult {
         /// All data points after merge, sorted by timestamp.
         let points: [HealthDataPoint]
         /// How many incoming points were genuinely new or had changed values.
@@ -90,7 +89,8 @@ struct HealthDataExporter: Sendable {
                     || existing.endTimestamp != point.endTimestamp
                     || existing.sourceName != point.sourceName
                     || existing.sourceBundleIdentifier != point.sourceBundleIdentifier
-                    || existing.categoryValue != point.categoryValue {
+                    || existing.categoryValue != point.categoryValue
+                {
                     newCount += 1
                 }
             } else {
@@ -192,7 +192,7 @@ struct HealthDataExporter: Sendable {
     // MARK: - Full Merge Pipeline
 
     /// The result of merging and encoding data.
-    struct MergeEncodeResult: Sendable {
+    struct MergeEncodeResult {
         /// The encoded data ready to write.
         let data: Data
         /// How many incoming points were genuinely new or had changed values.
@@ -217,26 +217,24 @@ struct HealthDataExporter: Sendable {
         incoming: [HealthDataPoint],
         format: ExportFormat
     ) throws -> MergeEncodeResult {
-        let existing: [HealthDataPoint]
-        if let data = existingData {
+        let existing: [HealthDataPoint] = if let data = existingData {
             switch format {
             case .json:
-                existing = decodeJSON(data)
+                decodeJSON(data)
             case .csv:
-                existing = decodeCSV(data)
+                decodeCSV(data)
             }
         } else {
-            existing = []
+            []
         }
 
         let merged = merge(existing: existing, incoming: incoming)
 
-        let encoded: Data
-        switch format {
+        let encoded: Data = switch format {
         case .json:
-            encoded = try encodeJSON(merged.points)
+            try encodeJSON(merged.points)
         case .csv:
-            encoded = encodeCSV(merged.points)
+            encodeCSV(merged.points)
         }
 
         return MergeEncodeResult(data: encoded, newCount: merged.newCount)
@@ -314,7 +312,8 @@ struct HealthDataExporter: Sendable {
               let metricType = HealthMetricType(rawValue: fields[1]),
               let value = Double(fields[2]),
               let timestamp = isoFormatter.date(from: fields[4]),
-              let endTimestamp = isoFormatter.date(from: fields[5]) else {
+              let endTimestamp = isoFormatter.date(from: fields[5])
+        else {
             return nil
         }
 
@@ -388,7 +387,7 @@ struct HealthDataExporter: Sendable {
 // MARK: - DateMetricKey
 
 /// A hashable key combining a date string and metric type for grouping.
-struct DateMetricKey: Hashable, Sendable {
+struct DateMetricKey: Hashable {
     let dateString: String
     let metricType: HealthMetricType
 }

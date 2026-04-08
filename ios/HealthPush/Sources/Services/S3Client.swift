@@ -11,7 +11,7 @@ import os
 // MARK: - S3Error
 
 /// Errors specific to S3 operations.
-enum S3Error: LocalizedError, Sendable {
+enum S3Error: LocalizedError {
     case invalidConfiguration(String)
     case uploadFailed(String)
     case downloadFailed(String)
@@ -20,16 +20,16 @@ enum S3Error: LocalizedError, Sendable {
 
     var errorDescription: String? {
         switch self {
-        case .invalidConfiguration(let msg):
-            return "Invalid S3 configuration: \(msg)"
-        case .uploadFailed(let msg):
-            return "S3 upload failed: \(msg)"
-        case .downloadFailed(let msg):
-            return "S3 download failed: \(msg)"
-        case .connectionFailed(let msg):
-            return "S3 connection failed: \(msg)"
+        case let .invalidConfiguration(msg):
+            "Invalid S3 configuration: \(msg)"
+        case let .uploadFailed(msg):
+            "S3 upload failed: \(msg)"
+        case let .downloadFailed(msg):
+            "S3 download failed: \(msg)"
+        case let .connectionFailed(msg):
+            "S3 connection failed: \(msg)"
         case .authenticationFailed:
-            return "S3 authentication failed. Check your access keys."
+            "S3 authentication failed. Check your access keys."
         }
     }
 }
@@ -40,8 +40,7 @@ enum S3Error: LocalizedError, Sendable {
 ///
 /// Supports AWS S3 plus S3-compatible endpoints such as MinIO.
 /// Uses only URLSession — no third-party dependencies.
-struct S3Client: Sendable {
-
+struct S3Client {
     let bucket: String
     let region: String
 
@@ -63,7 +62,7 @@ struct S3Client: Sendable {
     ) {
         self.bucket = bucket
         self.region = region
-        self.signer = S3Signer(accessKeyID: accessKeyID, secretAccessKey: secretAccessKey, region: region)
+        signer = S3Signer(accessKeyID: accessKeyID, secretAccessKey: secretAccessKey, region: region)
         let normalizedEndpoint = endpointOverride.map(Self.normalizedEndpoint)
         self.endpointOverride = normalizedEndpoint?.isEmpty == false ? normalizedEndpoint : nil
 
@@ -90,7 +89,8 @@ struct S3Client: Sendable {
         guard let components = URLComponents(string: normalized),
               let scheme = components.scheme?.lowercased(),
               ["http", "https"].contains(scheme),
-              components.host != nil else {
+              components.host != nil
+        else {
             return "Enter a full http:// or https:// endpoint"
         }
 
@@ -149,7 +149,7 @@ struct S3Client: Sendable {
         switch http.statusCode {
         case 200...299:
             #if canImport(os)
-            logger.debug("Uploaded \(data.count) bytes to s3://\(self.bucket)/\(key)")
+            logger.debug("Uploaded \(data.count) bytes to s3://\(bucket)/\(key)")
             #endif
         case 403:
             throw S3Error.authenticationFailed
@@ -216,7 +216,8 @@ struct S3Client: Sendable {
         queryItems: [URLQueryItem]
     ) throws -> URL {
         guard var components = URLComponents(string: endpointOverride),
-              components.host != nil else {
+              components.host != nil
+        else {
             throw S3Error.invalidConfiguration("Invalid endpoint URL: \(endpointOverride)")
         }
 
@@ -263,7 +264,8 @@ struct S3Client: Sendable {
             switch error.code {
             case .timedOut:
                 throw S3Error.connectionFailed("Request timed out")
-            case .notConnectedToInternet, .networkConnectionLost:
+            case .notConnectedToInternet,
+                 .networkConnectionLost:
                 throw S3Error.connectionFailed("No internet connection")
             default:
                 throw S3Error.connectionFailed(error.localizedDescription)

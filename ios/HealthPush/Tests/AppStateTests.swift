@@ -1,13 +1,11 @@
-import Testing
 import Foundation
+import Testing
 @testable import HealthPush
 
 // MARK: - AppStateTests
 
-@Suite("AppState")
 @MainActor
 struct AppStateTests {
-
     // MARK: Setup
 
     /// Clears UserDefaults keys used by AppState before each test.
@@ -32,7 +30,7 @@ struct AppStateTests {
     // MARK: lastSyncTime
 
     @Test("refreshFromUserDefaults loads lastSyncTime from UserDefaults")
-    func refreshLoadsLastSyncTime() {
+    func refreshLoadsLastSyncTime() throws {
         cleanDefaults()
         let state = AppState()
 
@@ -41,7 +39,7 @@ struct AppStateTests {
         state.refreshFromUserDefaults()
 
         #expect(state.lastSyncTime != nil)
-        #expect(abs(state.lastSyncTime!.timeIntervalSince(now)) < 1)
+        #expect(try abs(#require(state.lastSyncTime?.timeIntervalSince(now))) < 1)
     }
 
     @Test("refreshFromUserDefaults sets nil when no sync has occurred")

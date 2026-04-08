@@ -1,17 +1,40 @@
 # HealthPush Code Owners
-# These owners will be automatically requested for review on PRs.
+# These owners are automatically requested for review on PRs.
 # See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Keep this file in sync with MAINTAINERS.md. Only list handles that exist on GitHub —
+# phantom team references silently skip CODEOWNERS enforcement.
 
-# Default owner for everything
-*                                   @healthpush/maintainers
+# ── Default owner ─────────────────────────────────────────────────
+*                                       @danburtenshaw
 
-# iOS app
-/ios/                               @healthpush/ios-team
-/fastlane/                          @healthpush/ios-team
+# ── iOS app ───────────────────────────────────────────────────────
+/ios/                                   @danburtenshaw
+/packages/HealthPushStorageCore/        @danburtenshaw
+/fastlane/                              @danburtenshaw
 
-# Home Assistant integration
-/integrations/homeassistant/        @healthpush/ha-team
+# ── Home Assistant integration ────────────────────────────────────
+/integrations/homeassistant/            @danburtenshaw
 
-# CI/CD pipelines — require maintainer review for workflow changes
-/.github/workflows/                 @healthpush/maintainers
-/.github/dependabot.yml             @healthpush/maintainers
+# ── Docs and governance ───────────────────────────────────────────
+/docs/                                  @danburtenshaw
+/CLAUDE.md                              @danburtenshaw
+/AGENTS.md                              @danburtenshaw
+/GOVERNANCE.md                          @danburtenshaw
+/MAINTAINERS.md                         @danburtenshaw
+/CONTRIBUTING.md                        @danburtenshaw
+/SECURITY.md                            @danburtenshaw
+/README.md                              @danburtenshaw
+
+# ── CI/CD and repo tooling — require review for every change ────
+/.github/workflows/                     @danburtenshaw
+/.github/dependabot.yml                 @danburtenshaw
+/.github/labels.yml                     @danburtenshaw
+/.github/CODEOWNERS                     @danburtenshaw
+/scripts/                               @danburtenshaw
+/.swiftlint.yml                         @danburtenshaw
+/.swiftformat                           @danburtenshaw
+/.pre-commit-config.yaml                @danburtenshaw
+/rulesets/                              @danburtenshaw
+/release-please-config.json             @danburtenshaw
+/.release-please-manifest.json          @danburtenshaw

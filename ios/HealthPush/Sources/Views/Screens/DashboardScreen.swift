@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -8,7 +8,6 @@ import UIKit
 
 /// The main screen showing sync status, quick stats, destinations, and a sync button.
 struct DashboardScreen: View {
-
     // MARK: Properties
 
     @Environment(AppState.self) private var appState
@@ -314,9 +313,11 @@ struct DashboardScreen: View {
                 .font(.headline)
                 .foregroundStyle(.orange)
 
-            Text("Your first sync completed but found no health data. This usually means HealthPush does not have permission to read the selected metrics. You can review permissions in the Health app under Sharing > Apps > HealthPush.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            Text(
+                "Your first sync completed but found no health data. This usually means HealthPush does not have permission to read the selected metrics. You can review permissions in the Health app under Sharing > Apps > HealthPush."
+            )
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
 
             HStack(spacing: 12) {
                 Button("Open Health App") {
@@ -405,7 +406,9 @@ struct DashboardScreen: View {
 
             checklistRow(
                 title: "Health access",
-                detail: appState.healthKitAuthorized ? "Apple Health permissions are configured." : "Grant access so HealthPush can read the metrics you select.",
+                detail: appState
+                    .healthKitAuthorized ? "Apple Health permissions are configured." :
+                    "Grant access so HealthPush can read the metrics you select.",
                 isComplete: appState.healthKitAuthorized
             )
 
@@ -417,7 +420,9 @@ struct DashboardScreen: View {
 
             checklistRow(
                 title: "First successful sync",
-                detail: appState.lastSyncTime == nil ? "Run Sync Now once your destination is configured." : "Last completed \(appState.lastSyncTimeFormatted).",
+                detail: appState
+                    .lastSyncTime == nil ? "Run Sync Now once your destination is configured." :
+                    "Last completed \(appState.lastSyncTimeFormatted).",
                 isComplete: appState.lastSyncTime != nil
             )
 
@@ -504,7 +509,6 @@ struct DashboardScreen: View {
 // MARK: - RecentSyncRow
 
 private struct RecentSyncRow: View {
-
     let record: SyncRecord
 
     var body: some View {
@@ -536,28 +540,28 @@ private struct RecentSyncRow: View {
 
     private var statusDescription: String {
         switch record.status {
-        case .success: return "successful"
-        case .partialFailure: return "partially failed"
-        case .failure: return "failed"
-        case .inProgress: return "in progress"
+        case .success: "successful"
+        case .partialFailure: "partially failed"
+        case .failure: "failed"
+        case .inProgress: "in progress"
         }
     }
 
     private var statusIcon: String {
         switch record.status {
-        case .success: return "checkmark.circle.fill"
-        case .partialFailure: return "exclamationmark.circle.fill"
-        case .failure: return "xmark.circle.fill"
-        case .inProgress: return "arrow.triangle.2.circlepath"
+        case .success: "checkmark.circle.fill"
+        case .partialFailure: "exclamationmark.circle.fill"
+        case .failure: "xmark.circle.fill"
+        case .inProgress: "arrow.triangle.2.circlepath"
         }
     }
 
     private var statusColor: Color {
         switch record.status {
-        case .success: return .green
-        case .partialFailure: return .orange
-        case .failure: return .red
-        case .inProgress: return .blue
+        case .success: .green
+        case .partialFailure: .orange
+        case .failure: .red
+        case .inProgress: .blue
         }
     }
 }

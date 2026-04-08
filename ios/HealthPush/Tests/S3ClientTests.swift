@@ -1,12 +1,11 @@
-import Testing
 import Foundation
+import Testing
 @testable import HealthPush
 
 // MARK: - S3ClientTests
 
-@Suite("S3Client", .serialized)
+@Suite(.serialized)
 struct S3ClientTests {
-
     @Test("Custom endpoints use path-style URLs and include the port in the signed host header")
     func customEndpointUsesPathStyleAddressing() async throws {
         let session = makeStubSession()
@@ -55,7 +54,7 @@ struct S3ClientTests {
             #expect(Bool(false), "Expected invalid configuration error")
         } catch let error as S3Error {
             switch error {
-            case .invalidConfiguration(let message):
+            case let .invalidConfiguration(message):
                 #expect(message.contains("Invalid endpoint URL"))
             default:
                 #expect(Bool(false), "Unexpected S3 error: \(error)")
@@ -78,7 +77,7 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
     typealias Handler = @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)
 
     private static let lock = NSLock()
-    nonisolated(unsafe) private static var handler: Handler?
+    private nonisolated(unsafe) static var handler: Handler?
 
     static func setHandler(_ newHandler: @escaping Handler) {
         lock.lock()
@@ -120,5 +119,5 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
         }
     }
 
-    override func stopLoading() {}
+    override func stopLoading() { }
 }

@@ -5,7 +5,6 @@ import SwiftUI
 /// A row displaying a health metric with its icon, name, and a toggle
 /// for enabling/disabling sync of that metric.
 struct MetricRow: View {
-
     // MARK: Properties
 
     let metric: HealthMetricType
@@ -56,11 +55,11 @@ struct MetricRow: View {
 
     private var iconColor: Color {
         switch metric.category {
-        case .activity: return .orange
-        case .body: return .purple
-        case .vitals: return .red
-        case .sleep: return .indigo
-        case .nutrition: return .green
+        case .activity: .orange
+        case .body: .purple
+        case .vitals: .red
+        case .sleep: .indigo
+        case .nutrition: .green
         }
     }
 }

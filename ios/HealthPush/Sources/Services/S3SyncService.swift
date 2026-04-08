@@ -7,7 +7,7 @@ import os
 // MARK: - S3SyncStats
 
 /// Statistics returned by the shared S3 sync service.
-struct S3SyncStats: Sendable {
+struct S3SyncStats {
     let processedCount: Int
     let newCount: Int
 }
@@ -15,8 +15,7 @@ struct S3SyncStats: Sendable {
 // MARK: - S3SyncService
 
 /// Shared S3 sync logic used by the app and Linux package tests.
-struct S3SyncService: Sendable {
-
+struct S3SyncService {
     typealias ProgressHandler = @Sendable (Int, Int) -> Void
 
     private let s3Client: S3Client

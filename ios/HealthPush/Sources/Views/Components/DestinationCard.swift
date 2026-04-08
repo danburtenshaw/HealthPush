@@ -4,7 +4,6 @@ import SwiftUI
 
 /// A card displaying a destination's name, type, and connection status.
 struct DestinationCard: View {
-
     // MARK: Properties
 
     let config: DestinationConfig
@@ -115,8 +114,8 @@ struct DestinationCard: View {
 
     private var iconBackgroundColor: Color {
         switch config.destinationType {
-        case .homeAssistant: return .blue
-        case .s3: return .orange
+        case .homeAssistant: .blue
+        case .s3: .orange
         }
     }
 
@@ -167,15 +166,12 @@ struct DestinationCard: View {
 
 #Preview {
     VStack(spacing: 12) {
-        DestinationCard(config: {
-            let c = DestinationConfig(
-                name: "Home Assistant",
-                destinationType: .homeAssistant,
-                baseURL: "http://homeassistant.local:8123",
-                apiToken: "abc123"
-            )
-            return c
-        }())
+        DestinationCard(config: DestinationConfig(
+            name: "Home Assistant",
+            destinationType: .homeAssistant,
+            baseURL: "http://homeassistant.local:8123",
+            apiToken: "abc123"
+        ))
 
         DestinationCard(config: {
             let c = DestinationConfig(

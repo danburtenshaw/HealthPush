@@ -43,7 +43,15 @@ jobs:
           xcrun simctl list devices available | grep "iPhone 16"
 
       - name: Install build tools
-        run: brew install xcodegen xcbeautify
+        run: brew install xcodegen xcbeautify swiftlint swiftformat
+
+      - name: SwiftLint (warnings-only)
+        working-directory: ${{ github.workspace }}
+        run: swiftlint lint --reporter github-actions-logging || true
+
+      - name: SwiftFormat lint (non-blocking)
+        working-directory: ${{ github.workspace }}
+        run: swiftformat --lint . || true
 
       - name: Generate Xcode project
         working-directory: ${{ env.PROJECT_DIR }}

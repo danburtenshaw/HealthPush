@@ -4,16 +4,16 @@ import os
 // MARK: - S3DestinationError
 
 /// Errors specific to S3 destination operations.
-enum S3DestinationError: LocalizedError, Sendable {
+enum S3DestinationError: LocalizedError {
     case invalidConfiguration(String)
     case syncFailed(String)
 
     var errorDescription: String? {
         switch self {
-        case .invalidConfiguration(let msg):
-            return "Invalid S3 configuration: \(msg)"
-        case .syncFailed(let msg):
-            return "S3 sync failed: \(msg)"
+        case let .invalidConfiguration(msg):
+            "Invalid S3 configuration: \(msg)"
+        case let .syncFailed(msg):
+            "S3 sync failed: \(msg)"
         }
     }
 }
@@ -44,7 +44,6 @@ enum S3DestinationError: LocalizedError, Sendable {
 /// This means frequent syncs (minutely, hourly) are safe — they produce
 /// the same result as a single sync covering the full window.
 struct S3Destination: SyncDestination {
-
     // MARK: Properties
 
     let id: UUID
@@ -70,17 +69,17 @@ struct S3Destination: SyncDestination {
     /// - `s3Endpoint` → Optional custom S3-compatible endpoint
     /// - `s3ExportFormatRaw` → Export format
     init(config: DestinationConfig, migrateSecretsIfNeeded: Bool = true) throws {
-        self.id = config.id
-        self.name = config.name
-        self.isEnabled = config.isEnabled
-        let s3Client = S3Client(
+        id = config.id
+        name = config.name
+        isEnabled = config.isEnabled
+        let s3Client = try S3Client(
             bucket: config.baseURL,
             region: config.s3Region.isEmpty ? "us-east-1" : config.s3Region,
-            accessKeyID: try config.apiTokenValue(migratingIfNeeded: migrateSecretsIfNeeded),
-            secretAccessKey: try config.s3SecretAccessKeyValue(migratingIfNeeded: migrateSecretsIfNeeded),
+            accessKeyID: config.apiTokenValue(migratingIfNeeded: migrateSecretsIfNeeded),
+            secretAccessKey: config.s3SecretAccessKeyValue(migratingIfNeeded: migrateSecretsIfNeeded),
             endpointOverride: config.s3Endpoint
         )
-        self.syncService = S3SyncService(
+        syncService = S3SyncService(
             s3Client: s3Client,
             pathPrefix: config.s3PathPrefix,
             exportFormat: config.exportFormat

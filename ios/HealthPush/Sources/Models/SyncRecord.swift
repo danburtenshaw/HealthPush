@@ -4,7 +4,7 @@ import SwiftData
 // MARK: - SyncStatus
 
 /// The outcome of a sync operation.
-enum SyncStatus: String, Codable, Sendable {
+enum SyncStatus: String, Codable {
     case success
     case partialFailure
     case failure
@@ -19,7 +19,6 @@ enum SyncStatus: String, Codable, Sendable {
 /// to track what happened.
 @Model
 final class SyncRecord {
-
     /// Unique identifier.
     var id: UUID
 
@@ -72,13 +71,13 @@ final class SyncRecord {
         errorMessage: String? = nil,
         isBackgroundSync: Bool = false
     ) {
-        self.id = UUID()
+        id = UUID()
         self.destinationName = destinationName
         self.destinationID = destinationID
         self.timestamp = timestamp
         self.duration = duration
         self.dataPointCount = dataPointCount
-        self.statusRaw = status.rawValue
+        statusRaw = status.rawValue
         self.errorMessage = errorMessage
         self.isBackgroundSync = isBackgroundSync
     }

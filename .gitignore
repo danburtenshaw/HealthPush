@@ -60,3 +60,6 @@ venv/
 # Archives
 *.zip
 *.tar.gz
+
+# Local
+.local/

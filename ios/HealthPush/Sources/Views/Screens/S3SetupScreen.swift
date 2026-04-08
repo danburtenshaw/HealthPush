@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - S3SetupScreen
 
@@ -8,7 +8,6 @@ import SwiftData
 /// Provides fields for bucket name, region, optional custom endpoint, access keys, path prefix,
 /// export format, a connection test button, and a metric picker.
 struct S3SetupScreen: View {
-
     // MARK: Properties
 
     let mode: SetupMode
@@ -32,7 +31,7 @@ struct S3SetupScreen: View {
     @State private var enabledMetrics: Set<HealthMetricType> = Set(HealthMetricType.allCases)
     @State private var syncFrequency: SyncFrequency = .oneHour
     @State private var syncStartDateOption: SyncStartDateOption = .last7Days
-    @State private var syncStartDateCustom: Date = Calendar.current.date(byAdding: .day, value: -7, to: .now)!
+    @State private var syncStartDateCustom = Date.now.daysAgo(7)
     @State private var isEnabled = true
 
     @State private var isTesting = false
@@ -75,7 +74,7 @@ struct S3SetupScreen: View {
             }
             .alert("Delete Destination", isPresented: $showingDeleteConfirmation) {
                 Button("Delete", role: .destructive) { deleteDestination() }
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel", role: .cancel) { }
             } message: {
                 Text("This will permanently remove this destination and stop all syncing to it.")
             }
@@ -152,10 +151,10 @@ struct S3SetupScreen: View {
                     hasStoredAccessKeyID && accessKeyID.isEmpty ? "Saved in Keychain" : "AKIA...",
                     text: $accessKeyID
                 )
-                    .multilineTextAlignment(.trailing)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                    .fontDesign(.monospaced)
+                .multilineTextAlignment(.trailing)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .fontDesign(.monospaced)
             } label: {
                 Label("Access Key ID", systemImage: "key.fill")
             }
@@ -165,9 +164,9 @@ struct S3SetupScreen: View {
                     hasStoredSecretAccessKey && secretAccessKey.isEmpty ? "Saved in Keychain" : "Secret access key",
                     text: $secretAccessKey
                 )
-                    .multilineTextAlignment(.trailing)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+                .multilineTextAlignment(.trailing)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
             } label: {
                 Label("Secret Key", systemImage: "lock.fill")
             }
@@ -265,7 +264,9 @@ struct S3SetupScreen: View {
         } header: {
             Text("Sync Window")
         } footer: {
-            Text("How far back to sync health data. Changing this triggers a full re-sync. After that, only the last 3 days are re-checked each time.")
+            Text(
+                "How far back to sync health data. Changing this triggers a full re-sync. After that, only the last 3 days are re-checked each time."
+            )
         }
     }
 
@@ -329,7 +330,7 @@ struct S3SetupScreen: View {
         case .success:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
-        case .failure(let message):
+        case let .failure(message):
             HStack(spacing: 4) {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.red)
@@ -349,7 +350,7 @@ struct S3SetupScreen: View {
             switch testResult {
             case .success:
                 return "Test Connection, passed"
-            case .failure(let message):
+            case let .failure(message):
                 return "Test Connection, failed: \(message)"
             }
         }
@@ -382,7 +383,7 @@ struct S3SetupScreen: View {
     // MARK: Data Loading
 
     private func loadExistingConfig() {
-        guard case .edit(let config) = mode else { return }
+        guard case let .edit(config) = mode else { return }
         name = config.name
         bucketName = config.baseURL
         region = config.s3Region.isEmpty ? "us-east-1" : config.s3Region
@@ -396,7 +397,7 @@ struct S3SetupScreen: View {
         enabledMetrics = config.enabledMetrics
         syncFrequency = config.syncFrequency
         syncStartDateOption = config.syncStartDateOption
-        syncStartDateCustom = config.syncStartDateCustom ?? Calendar.current.date(byAdding: .day, value: -7, to: .now)!
+        syncStartDateCustom = config.syncStartDateCustom ?? Date.now.daysAgo(7)
         isEnabled = config.isEnabled
     }
 
@@ -430,7 +431,7 @@ struct S3SetupScreen: View {
                     modelContext: modelContext
                 )
 
-            case .edit(let config):
+            case let .edit(config):
                 let startDateChanged = config.syncStartDateOption != syncStartDateOption
                     || (syncStartDateOption == .custom && config.syncStartDateCustom != syncStartDateCustom)
 
@@ -476,7 +477,7 @@ struct S3SetupScreen: View {
     }
 
     private func deleteDestination() {
-        guard case .edit(let config) = mode else { return }
+        guard case let .edit(config) = mode else { return }
         do {
             try destinationManager.deleteDestination(config, modelContext: modelContext)
         } catch {
@@ -490,22 +491,20 @@ struct S3SetupScreen: View {
         isTesting = true
         testResult = nil
 
-        let effectiveAccessKeyID: String
-        if !accessKeyID.trimmingCharacters(in: .whitespaces).isEmpty {
-            effectiveAccessKeyID = accessKeyID.trimmingCharacters(in: .whitespaces)
-        } else if case .edit(let config) = mode {
-            effectiveAccessKeyID = (try? config.resolvedAPIToken) ?? ""
+        let effectiveAccessKeyID: String = if !accessKeyID.trimmingCharacters(in: .whitespaces).isEmpty {
+            accessKeyID.trimmingCharacters(in: .whitespaces)
+        } else if case let .edit(config) = mode {
+            (try? config.resolvedAPIToken) ?? ""
         } else {
-            effectiveAccessKeyID = ""
+            ""
         }
 
-        let effectiveSecretAccessKey: String
-        if !secretAccessKey.trimmingCharacters(in: .whitespaces).isEmpty {
-            effectiveSecretAccessKey = secretAccessKey.trimmingCharacters(in: .whitespaces)
-        } else if case .edit(let config) = mode {
-            effectiveSecretAccessKey = (try? config.resolvedS3SecretAccessKey) ?? ""
+        let effectiveSecretAccessKey: String = if !secretAccessKey.trimmingCharacters(in: .whitespaces).isEmpty {
+            secretAccessKey.trimmingCharacters(in: .whitespaces)
+        } else if case let .edit(config) = mode {
+            (try? config.resolvedS3SecretAccessKey) ?? ""
         } else {
-            effectiveSecretAccessKey = ""
+            ""
         }
 
         let client = S3Client(
@@ -588,13 +587,13 @@ struct S3SetupScreen: View {
         ("eu-south-1", "Europe (Milan)"),
         ("me-south-1", "Middle East (Bahrain)"),
         ("me-central-1", "Middle East (UAE)"),
-        ("sa-east-1", "South America (Sao Paulo)"),
+        ("sa-east-1", "South America (Sao Paulo)")
     ]
 }
 
 // MARK: - S3TestResult
 
-// S3TestResult is intentionally private per file (same pattern as HomeAssistantSetupScreen).
+/// S3TestResult is intentionally private per file (same pattern as HomeAssistantSetupScreen).
 private enum S3TestResult {
     case success
     case failure(String)

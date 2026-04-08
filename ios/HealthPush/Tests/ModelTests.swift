@@ -1,13 +1,11 @@
-import Testing
 import Foundation
 import SwiftData
+import Testing
 @testable import HealthPush
 
 // MARK: - SyncRecordTests
 
-@Suite("SyncRecord")
 struct SyncRecordTests {
-
     @Test("Creates a sync record with default values")
     func defaultInit() {
         let record = SyncRecord(
@@ -66,9 +64,7 @@ struct SyncRecordTests {
 
 // MARK: - DestinationConfigTests
 
-@Suite("DestinationConfig")
 struct DestinationConfigTests {
-
     @Test("Creates a destination config with default values")
     func defaultInit() {
         let config = DestinationConfig()
@@ -162,9 +158,7 @@ struct DestinationConfigTests {
 
 // MARK: - SyncStatusTests
 
-@Suite("SyncStatus")
 struct SyncStatusTests {
-
     @Test("All cases have valid raw values")
     func rawValues() {
         #expect(SyncStatus.success.rawValue == "success")
@@ -189,9 +183,7 @@ struct SyncStatusTests {
 
 // MARK: - DestinationTypeTests
 
-@Suite("DestinationType")
 struct DestinationTypeTests {
-
     @Test("Home Assistant type properties")
     func homeAssistant() {
         let type = DestinationType.homeAssistant

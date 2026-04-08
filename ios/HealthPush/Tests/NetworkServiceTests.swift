@@ -1,12 +1,10 @@
-import Testing
 import Foundation
+import Testing
 @testable import HealthPush
 
 // MARK: - NetworkServiceTests
 
-@Suite("NetworkService")
 struct NetworkServiceTests {
-
     // MARK: Initialization
 
     @Test("Creates a network service with default configuration")
@@ -49,7 +47,7 @@ struct NetworkServiceTests {
     // MARK: Error Types
 
     @Test("NetworkError has localized descriptions")
-    func errorDescriptions() {
+    func errorDescriptions() throws {
         let errors: [NetworkError] = [
             .invalidURL("http://bad"),
             .invalidResponse,
@@ -62,7 +60,7 @@ struct NetworkServiceTests {
 
         for error in errors {
             #expect(error.errorDescription != nil)
-            #expect(!error.errorDescription!.isEmpty)
+            #expect(try !(#require(error.errorDescription?.isEmpty)))
         }
     }
 

@@ -1,12 +1,10 @@
-import Testing
 import Foundation
+import Testing
 @testable import HealthPush
 
 // MARK: - HealthDataExporterTests
 
-@Suite("HealthDataExporter")
 struct HealthDataExporterTests {
-
     private let exporter = HealthDataExporter()
 
     // MARK: Helpers
@@ -15,7 +13,7 @@ struct HealthDataExporterTests {
         id: UUID = UUID(),
         metricType: HealthMetricType = .heartRate,
         value: Double = 72.0,
-        timestamp: Date = Date(timeIntervalSince1970: 1700000000),
+        timestamp: Date = Date(timeIntervalSince1970: 1_700_000_000),
         sourceName: String = "Apple Watch",
         sourceBundleIdentifier: String? = "com.apple.health",
         categoryValue: Int? = nil
@@ -36,7 +34,7 @@ struct HealthDataExporterTests {
     // MARK: CSV Round-Trip
 
     @Test("CSV round-trip preserves source name with quotes")
-    func csvRoundTripWithQuotes() throws {
+    func csvRoundTripWithQuotes() {
         let point = makePoint(sourceName: "Jane's \"Fitbit\"")
         let csv = exporter.encodeCSV([point])
         let decoded = exporter.decodeCSV(csv)
@@ -48,7 +46,7 @@ struct HealthDataExporterTests {
     }
 
     @Test("CSV round-trip preserves source name with commas")
-    func csvRoundTripWithCommas() throws {
+    func csvRoundTripWithCommas() {
         let point = makePoint(sourceName: "GymKit, Treadmill", categoryValue: 3)
         let csv = exporter.encodeCSV([point])
         let decoded = exporter.decodeCSV(csv)
@@ -59,10 +57,10 @@ struct HealthDataExporterTests {
     }
 
     @Test("CSV handles multiple data points")
-    func csvRoundTripMultiplePoints() throws {
+    func csvRoundTripMultiplePoints() {
         let points = [
             makePoint(value: 72.0, sourceName: "Apple Watch"),
-            makePoint(value: 80.0, sourceName: "iPhone"),
+            makePoint(value: 80.0, sourceName: "iPhone")
         ]
         let csv = exporter.encodeCSV(points)
         let decoded = exporter.decodeCSV(csv)
@@ -136,13 +134,13 @@ struct HealthDataExporterTests {
 
     @Test("Groups data points by date and metric type")
     func groupByDateAndMetric() {
-        let day1 = Date(timeIntervalSince1970: 1700000000) // 2023-11-14
-        let day2 = day1.addingTimeInterval(86400)           // 2023-11-15
+        let day1 = Date(timeIntervalSince1970: 1_700_000_000) // 2023-11-14
+        let day2 = day1.addingTimeInterval(86400) // 2023-11-15
 
         let points = [
             makePoint(metricType: .steps, timestamp: day1),
             makePoint(metricType: .heartRate, timestamp: day1),
-            makePoint(metricType: .steps, timestamp: day2),
+            makePoint(metricType: .steps, timestamp: day2)
         ]
 
         let grouped = exporter.groupByDateAndMetric(points)

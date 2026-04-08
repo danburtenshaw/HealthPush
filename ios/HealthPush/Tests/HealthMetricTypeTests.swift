@@ -1,12 +1,10 @@
-import Testing
 import HealthKit
+import Testing
 @testable import HealthPush
 
 // MARK: - HealthMetricTypeTests
 
-@Suite("HealthMetricType")
 struct HealthMetricTypeTests {
-
     // MARK: All Cases
 
     @Test("All cases are present")
@@ -112,7 +110,7 @@ struct HealthMetricTypeTests {
 
     @Test("Exactly 11 metrics are cumulative")
     func cumulativeTypes() {
-        let cumulative = HealthMetricType.allCases.filter { $0.isCumulative }
+        let cumulative = HealthMetricType.allCases.filter(\.isCumulative)
         let expected: Set<HealthMetricType> = [
             .steps, .activeEnergyBurned, .basalEnergyBurned,
             .distanceWalkingRunning, .distanceCycling, .flightsClimbed,

@@ -18,8 +18,7 @@ import Crypto
 /// No third-party dependencies required.
 ///
 /// Reference: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
-struct S3Signer: Sendable {
-
+struct S3Signer {
     let accessKeyID: String
     let secretAccessKey: String
     let region: String
@@ -55,13 +54,13 @@ struct S3Signer: Sendable {
 
         guard let url = request.url,
               let hostname = url.host() else { return }
-        let host: String
-        if let port = url.port,
-           !(url.scheme == "https" && port == 443),
-           !(url.scheme == "http" && port == 80) {
-            host = "\(hostname):\(port)"
+        let host: String = if let port = url.port,
+                              !(url.scheme == "https" && port == 443),
+                              !(url.scheme == "http" && port == 80)
+        {
+            "\(hostname):\(port)"
         } else {
-            host = hostname
+            hostname
         }
         request.setValue(host, forHTTPHeaderField: "Host")
 

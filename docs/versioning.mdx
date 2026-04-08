@@ -1,0 +1,84 @@
+---
+title: Versioning Policy
+description: How HealthPush versions its iOS app, Home Assistant integration, and storage core package — plus the relationship between product version and data schema version.
+---
+
+HealthPush is a monorepo that ships **three independent release trains**. Each has its own version number, its own tag format, and its own release cadence. They are never bundled into a single version.
+
+## The three release trains
+
+| Train | Source path | Distribution | Tag format |
+|---|---|---|---|
+| **iOS app** | `ios/HealthPush/` | App Store, TestFlight | `ios-v1.2.3` |
+| **HA integration** | `integrations/homeassistant/custom_components/healthpush/` | HACS + GitHub Release | `ha-v0.4.1` |
+| **Storage core** | `packages/HealthPushStorageCore/` | Swift Package Manager consumers | `storage-core-v0.1.0` |
+
+Docs under `docs/` deploy continuously and have no version number.
+
+## Semver per component
+
+Every release train follows [Semantic Versioning 2.0.0](https://semver.org/):
+
+- **MAJOR** — breaking change that requires user action.
+- **MINOR** — new feature, additive only.
+- **PATCH** — bug fix or internal change with no API surface impact.
+
+### Pre-1.0 policy
+
+While a component is pre-1.0 (`0.x.y`):
+
+- Breaking changes are allowed in minor bumps.
+- We try to flag them in the changelog as *"breaking"* but don't promise stability.
+- Users should expect rough edges and rapid change.
+
+### Post-1.0 policy
+
+Once a component has released `1.0.0`:
+
+- **Breaking changes require a MAJOR bump.**
+- Deprecations live for at least **two minor releases** before removal.
+- `release-please` automatically opens a release PR when the commit history warrants a new version.
+
+## Schema version is orthogonal to product version
+
+HealthPush has a **data schema contract** (see `docs/schema.md` once published) that is versioned independently of any product component. The schema lives at `v1` today.
+
+- A product minor release (e.g. `ios-v1.3.0`) does **not** imply a schema bump.
+- A schema MAJOR bump (e.g. `v2`) is signaled by a new folder prefix on S3, a new JSON `schemaVersion` value, and a new MQTT topic namespace — and coincides with a coordinated product release across all components that read or write the schema.
+- Within a schema MAJOR, changes are strictly **additive**. New optional fields may appear; existing fields never change type or meaning.
+- HealthPush commits to reading any `v1.x` data it has ever written, for the life of `v1`.
+
+This decoupling means you can upgrade the iOS app without worrying that your existing S3 bucket will suddenly become unreadable, and you can upgrade the HA integration without needing a new iOS build.
+
+## Conventional Commits drive releases
+
+Version bumps are **computed** from commit history, not hand-edited. The workflow is:
+
+1. Contributors open PRs with [Conventional Commit](https://www.conventionalcommits.org/) titles — see [`CONTRIBUTING.md`](https://github.com/danburtenshaw/HealthPush/blob/main/CONTRIBUTING.md#commit-messages--conventional-commits).
+2. PR titles are squash-merged to `main` and become commits.
+3. `release-please` (see `.github/workflows/release-please.yml`) reads the commit history for each package and opens a per-component release PR with:
+   - Computed new version.
+   - Generated changelog entry.
+   - Updated version marker in the relevant file (`project.yml`, `manifest.json`, etc.).
+4. A maintainer merges the release PR.
+5. The merge creates a tag in the relevant format, which triggers the matching release workflow (TestFlight for iOS, GitHub Release for HA, SPM tag for storage-core).
+
+## iOS build number
+
+The iOS build number (`CURRENT_PROJECT_VERSION` in `project.yml`) is set from `GITHUB_RUN_NUMBER` at release time — it is monotonically increasing and does not need to be managed by hand.
+
+`MARKETING_VERSION` is owned by `release-please` via the `extra-files` config in `release-please-config.json`.
+
+## Rollback
+
+- **iOS**: Phased Release is enabled for every App Store submission. If a regression is detected in the 72-hour watchdog window, the release can be paused directly from App Store Connect.
+- **HA**: mark the bad release as a pre-release on GitHub, and tag a fixed `ha-v*.*.x+1` immediately.
+- **Storage core**: never force-delete a published tag; cut a patch release instead.
+
+Emergency hotfixes bypass release-please via `workflow_dispatch` on the relevant release workflow, but the fix must still land on `main` via a normal PR first.
+
+## Why three trains?
+
+Coupling the iOS version to the HA version would force every HA patch to wait for an App Store review, and every iOS patch to churn HACS users. Coupling the storage core package to the iOS version would force external SPM consumers to track the app's release cadence.
+
+Independent trains let each component ship on its own risk surface and release cadence while still giving users a single source of truth for each.

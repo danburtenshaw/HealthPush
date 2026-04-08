@@ -5,7 +5,7 @@ import os
 // MARK: - HealthKitError
 
 /// Errors that can occur during HealthKit operations.
-enum HealthKitError: LocalizedError, Sendable {
+enum HealthKitError: LocalizedError {
     case notAvailable
     case authorizationDenied
     case queryFailed(String)
@@ -15,27 +15,27 @@ enum HealthKitError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .notAvailable:
-            return "HealthKit is not available on this device."
+            "HealthKit is not available on this device."
         case .authorizationDenied:
-            return "HealthKit authorization was denied. Please enable it in Settings."
-        case .queryFailed(let message):
-            return "HealthKit query failed: \(message)"
+            "HealthKit authorization was denied. Please enable it in Settings."
+        case let .queryFailed(message):
+            "HealthKit query failed: \(message)"
         case .noData:
-            return "No health data found for the requested period."
-        case .invalidType(let type):
-            return "Invalid health metric type: \(type)"
+            "No health data found for the requested period."
+        case let .invalidType(type):
+            "Invalid health metric type: \(type)"
         }
     }
 }
 
 // MARK: - HealthDataQueryResult
 
-struct HealthMetricQueryIssue: Sendable {
+struct HealthMetricQueryIssue {
     let metric: HealthMetricType
     let errorDescription: String
 }
 
-struct HealthDataQueryResult: Sendable {
+struct HealthDataQueryResult {
     var dataPoints: [HealthDataPoint]
     var issues: [HealthMetricQueryIssue]
 }
@@ -47,7 +47,6 @@ struct HealthDataQueryResult: Sendable {
 /// This actor serializes access to HKHealthStore and provides async methods
 /// for authorization, querying, and anchor-based incremental queries.
 actor HealthKitManager {
-
     // MARK: Properties
 
     private let healthStore: HKHealthStore
@@ -62,7 +61,7 @@ actor HealthKitManager {
         guard HKHealthStore.isHealthDataAvailable() else {
             throw HealthKitError.notAvailable
         }
-        self.healthStore = HKHealthStore()
+        healthStore = HKHealthStore()
     }
 
     // MARK: Authorization
@@ -75,7 +74,7 @@ actor HealthKitManager {
     /// Requests HealthKit authorization for the given metric types.
     /// - Parameter metrics: The health metrics to request read access for.
     func requestAuthorization(for metrics: Set<HealthMetricType>) async throws {
-        let readTypes: [HKObjectType] = metrics.compactMap { $0.hkSampleType }
+        let readTypes: [HKObjectType] = metrics.compactMap(\.hkSampleType)
         guard !readTypes.isEmpty else { return }
 
         let typesToRead = Set(readTypes)
@@ -253,9 +252,9 @@ actor HealthKitManager {
         to end: Date
     ) async throws -> [HealthDataPoint] {
         if metric.isCategoryType {
-            return try await queryCategoryMetric(metric, from: start, to: end)
+            try await queryCategoryMetric(metric, from: start, to: end)
         } else {
-            return try await queryQuantityMetric(metric, from: start, to: end)
+            try await queryQuantityMetric(metric, from: start, to: end)
         }
     }
 
@@ -390,7 +389,8 @@ actor HealthKitManager {
             observerQueries.append(query)
         }
 
-        logger.info("Background delivery enabled for \(metrics.count) metric types with \(self.observerQueries.count) observer queries")
+        let observerCount = observerQueries.count
+        logger.info("Background delivery enabled for \(metrics.count) metric types with \(observerCount) observer queries")
     }
 
     /// Stops all active observer queries.

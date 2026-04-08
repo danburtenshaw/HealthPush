@@ -1,11 +1,10 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - DestinationsScreen
 
 /// Screen listing all configured sync destinations with options to add, edit, or delete.
 struct DestinationsScreen: View {
-
     // MARK: Properties
 
     @Environment(DestinationManager.self) private var destinationManager

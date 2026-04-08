@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - HealthPushApp
 
@@ -9,7 +9,6 @@ import SwiftData
 /// and sets up the root view hierarchy with shared state objects.
 @main
 struct HealthPushApp: App {
-
     // MARK: Properties
 
     @State private var appState = AppState()
@@ -179,7 +178,6 @@ struct HealthPushApp: App {
 
 /// Root content view with tab-based navigation.
 struct ContentView: View {
-
     @Environment(AppState.self) private var appState
     @Environment(DestinationManager.self) private var destinationManager
     @Environment(\.scenePhase) private var scenePhase

@@ -1,0 +1,72 @@
+# HealthPush SwiftFormat config
+# Compatible with .swiftlint.yml — SwiftFormat owns formatting, SwiftLint owns lint.
+
+--swiftversion 6.0
+--indent 4
+--indentcase false
+--maxwidth 140
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--wrapconditions after-first
+--closingparen balanced
+--funcattributes prev-line
+--typeattributes prev-line
+--varattributes same-line
+--stripunusedargs closure-only
+--semicolons never
+--commas inline
+--ifdef no-indent
+--trimwhitespace always
+--emptybraces spaced
+--ranges no-space
+--operatorfunc spaced
+--nospaceoperators ...,..<
+--self remove
+--selfrequired
+--patternlet hoist
+--redundanttype inferred
+--importgrouping testable-bottom
+--xcodeindentation disabled
+--hexliteralcase uppercase
+--exponentcase lowercase
+--hexgrouping 4,8
+--decimalgrouping 3,6
+--fractiongrouping disabled
+--exponentgrouping disabled
+--marktypes always
+--markextensions never
+--header ignore
+--voidtype void
+
+# ── Enabled rules ─────────────────────────────────────────────────
+--enable isEmpty
+--enable wrapMultilineStatementBraces
+--enable blankLinesBetweenScopes
+--enable blankLinesBetweenImports
+--enable sortedImports
+--enable wrapEnumCases
+--enable wrapSwitchCases
+--enable redundantReturn
+--enable redundantSelf
+--enable redundantParens
+--enable redundantInit
+--enable redundantLet
+--enable redundantBackticks
+--enable redundantGet
+--enable redundantFileprivate
+--enable redundantExtensionACL
+--enable redundantObjc
+--enable redundantRawValues
+--enable strongifiedSelf
+--enable strongOutlets
+--enable typeSugar
+--enable yodaConditions
+
+# ── Disabled rules ────────────────────────────────────────────────
+--disable andOperator                # Prefer explicit && chains in guards
+--disable wrapMultilineStatementBraces
+--disable redundantProperty
+
+# ── Exclusions ────────────────────────────────────────────────────
+--exclude .build,.swiftpm,DerivedData,ios/HealthPush/HealthPush.xcodeproj,packages/HealthPushStorageCore/.build

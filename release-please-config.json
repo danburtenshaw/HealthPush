@@ -1,0 +1,62 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "draft": false,
+  "prerelease": false,
+  "separate-pull-requests": true,
+  "include-v-in-tag": false,
+  "include-component-in-tag": true,
+  "pull-request-title-pattern": "chore(${component}): release ${version}",
+  "changelog-sections": [
+    { "type": "feat", "section": "Features" },
+    { "type": "fix", "section": "Bug Fixes" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "security", "section": "Security" },
+    { "type": "refactor", "section": "Refactors" },
+    { "type": "docs", "section": "Documentation", "hidden": false },
+    { "type": "test", "section": "Tests", "hidden": true },
+    { "type": "chore", "section": "Chores", "hidden": true },
+    { "type": "ci", "section": "CI", "hidden": true },
+    { "type": "build", "section": "Build", "hidden": true }
+  ],
+  "packages": {
+    "ios/HealthPush": {
+      "package-name": "ios",
+      "component": "ios",
+      "release-type": "simple",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "project.yml"
+        }
+      ]
+    },
+    "integrations/homeassistant/custom_components/healthpush": {
+      "package-name": "ha",
+      "component": "ha",
+      "release-type": "simple",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "manifest.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    },
+    "packages/HealthPushStorageCore": {
+      "package-name": "storage-core",
+      "component": "storage-core",
+      "release-type": "simple",
+      "changelog-path": "CHANGELOG.md"
+    }
+  },
+  "plugins": [
+    {
+      "type": "sentence-case"
+    }
+  ]
+}

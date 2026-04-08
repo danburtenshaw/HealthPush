@@ -12,8 +12,7 @@ import Crypto
 ///
 /// This is the canonical interchange format between HealthKit queries
 /// and sync destinations. It is fully value-typed and `Sendable`.
-struct HealthDataPoint: Identifiable, Codable, Sendable, Equatable {
-
+struct HealthDataPoint: Identifiable, Codable, Equatable {
     /// Stable identifier derived from the HealthKit sample UUID.
     let id: UUID
 
@@ -94,9 +93,9 @@ struct HealthDataPoint: Identifiable, Codable, Sendable, Equatable {
         bytes[8] = (bytes[8] & 0x3F) | 0x80 // RFC 4122 variant
 
         return UUID(uuid: (
-            bytes[0],  bytes[1],  bytes[2],  bytes[3],
-            bytes[4],  bytes[5],  bytes[6],  bytes[7],
-            bytes[8],  bytes[9],  bytes[10], bytes[11],
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
             bytes[12], bytes[13], bytes[14], bytes[15]
         ))
     }

@@ -9,7 +9,7 @@ import UIKit
 // MARK: - HomeAssistantError
 
 /// Errors specific to Home Assistant webhook operations.
-enum HomeAssistantError: LocalizedError, Sendable {
+enum HomeAssistantError: LocalizedError {
     case invalidConfiguration(String)
     case connectionFailed(String)
     case authenticationFailed
@@ -17,14 +17,14 @@ enum HomeAssistantError: LocalizedError, Sendable {
 
     var errorDescription: String? {
         switch self {
-        case .invalidConfiguration(let message):
-            return "Invalid Home Assistant configuration: \(message)"
-        case .connectionFailed(let message):
-            return "Failed to connect to Home Assistant webhook: \(message)"
+        case let .invalidConfiguration(message):
+            "Invalid Home Assistant configuration: \(message)"
+        case let .connectionFailed(message):
+            "Failed to connect to Home Assistant webhook: \(message)"
         case .authenticationFailed:
-            return "Home Assistant webhook authentication failed. Check your webhook secret."
-        case .syncFailed(let message):
-            return "Failed to sync to Home Assistant webhook: \(message)"
+            "Home Assistant webhook authentication failed. Check your webhook secret."
+        case let .syncFailed(message):
+            "Failed to sync to Home Assistant webhook: \(message)"
         }
     }
 }
@@ -37,7 +37,6 @@ enum HomeAssistantError: LocalizedError, Sendable {
 /// configured webhook URL. The Home Assistant custom integration receives
 /// the payload and creates sensor entities automatically.
 struct HomeAssistantDestination: SyncDestination {
-
     // MARK: Properties
 
     let id: UUID
@@ -69,24 +68,24 @@ struct HomeAssistantDestination: SyncDestination {
         networkService: NetworkService = NetworkService(),
         migrateSecretsIfNeeded: Bool = true
     ) throws {
-        self.id = config.id
-        self.name = config.name
-        self.isEnabled = config.isEnabled
-        self.webhookURL = config.baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        self.webhookSecret = try config.apiTokenValue(migratingIfNeeded: migrateSecretsIfNeeded)
-        self.enabledMetrics = config.enabledMetrics
+        id = config.id
+        name = config.name
+        isEnabled = config.isEnabled
+        webhookURL = config.baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        webhookSecret = try config.apiTokenValue(migratingIfNeeded: migrateSecretsIfNeeded)
+        enabledMetrics = config.enabledMetrics
         self.networkService = networkService
     }
 
     // MARK: SyncDestination
 
-    /// Syncs health data points to Home Assistant via a single webhook POST.
-    ///
-    /// All enabled metrics are batched into one request. The webhook payload
-    /// contains the device name, a timestamp, and an array of metric objects.
-    ///
-    /// - Parameter data: The health data points to sync.
-    /// - Throws: ``HomeAssistantError`` if the webhook URL is empty or the request fails.
+    // Syncs health data points to Home Assistant via a single webhook POST.
+    //
+    // All enabled metrics are batched into one request. The webhook payload
+    // contains the device name, a timestamp, and an array of metric objects.
+    //
+    // - Parameter data: The health data points to sync.
+    // - Throws: ``HomeAssistantError`` if the webhook URL is empty or the request fails.
 
     /// Progress callback: (completedBatches, totalBatches)
     typealias ProgressHandler = @Sendable (Int, Int) -> Void
@@ -115,8 +114,8 @@ struct HomeAssistantDestination: SyncDestination {
         }
 
         // Single request — one value per metric is small enough
-        let payload: [String: Any] = [
-            "device_name": await MainActor.run { Self.currentDeviceName },
+        let payload: [String: Any] = await [
+            "device_name": MainActor.run { Self.currentDeviceName },
             "timestamp": formatter.string(from: Date()),
             "metrics": metrics
         ]
@@ -172,20 +171,21 @@ struct HomeAssistantDestination: SyncDestination {
             return true
         } catch let error as NetworkError {
             switch error {
-            case .httpError(let statusCode, _):
+            case let .httpError(statusCode, _):
                 switch statusCode {
                 case 400:
                     // Expected response for empty metrics — webhook is alive
                     logger.info("Home Assistant webhook connection test successful (400 = endpoint active)")
                     return true
-                case 401, 403:
+                case 401,
+                     403:
                     throw HomeAssistantError.authenticationFailed
                 case 404:
                     throw HomeAssistantError.connectionFailed("Webhook URL not found (HTTP 404).")
                 default:
                     throw HomeAssistantError.connectionFailed("HTTP \(statusCode)")
                 }
-            case .invalidURL(let url):
+            case let .invalidURL(url):
                 throw HomeAssistantError.invalidConfiguration("Invalid webhook URL: \(url)")
             case .timeout:
                 throw HomeAssistantError.connectionFailed("Request timed out.")
@@ -251,7 +251,8 @@ struct HomeAssistantDestination: SyncDestination {
     ) -> [String: Any]? {
         let asleepIntervals = mergedSleepIntervals(from: points)
         guard let firstInterval = asleepIntervals.first,
-              let lastInterval = asleepIntervals.last else {
+              let lastInterval = asleepIntervals.last
+        else {
             return nil
         }
 
@@ -320,18 +321,19 @@ struct HomeAssistantDestination: SyncDestination {
     ) -> [String: Any] {
         var displayValue = point.value
         switch point.metricType {
-        case .bodyFatPercentage, .oxygenSaturation:
+        case .bodyFatPercentage,
+             .oxygenSaturation:
             displayValue *= 100
         default:
             break
         }
 
-        let roundedValue: Any
-        switch point.metricType {
-        case .steps, .flightsClimbed:
-            roundedValue = Int(displayValue)
+        let roundedValue: Any = switch point.metricType {
+        case .steps,
+             .flightsClimbed:
+            Int(displayValue)
         default:
-            roundedValue = (displayValue * 100).rounded() / 100
+            (displayValue * 100).rounded() / 100
         }
 
         return [

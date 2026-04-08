@@ -1,0 +1,194 @@
+# HealthPush Home Assistant integration
+# Development tooling config: ruff (mirroring HA core), mypy strict, bandit, pytest-cov.
+#
+# This file governs lint/format/type-check/security-scan behavior in both local
+# pre-commit runs and the ha-integration-ci.yml workflow.
+
+[project]
+name = "healthpush-ha"
+version = "0.1.0"
+description = "HealthPush Home Assistant custom component"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "HealthPush Maintainers" }]
+
+# ──────────────────────────────────────────────────────────────────────
+# ruff — mirror Home Assistant core's ruleset as closely as is sensible
+# https://github.com/home-assistant/core/blob/dev/pyproject.toml
+# ──────────────────────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["custom_components", "tests"]
+extend-exclude = [
+  ".venv",
+  "venv",
+  "__pycache__",
+  ".pytest_cache",
+]
+
+[tool.ruff.lint]
+# HA core style — select broad rule families, then exempt what's infeasible.
+select = [
+  "A",     # flake8-builtins
+  "ARG",   # flake8-unused-arguments
+  "ASYNC", # flake8-async
+  "B",     # flake8-bugbear
+  "BLE",   # flake8-blind-except
+  "C4",    # flake8-comprehensions
+  "C90",   # mccabe
+  "COM",   # flake8-commas
+  "D",     # pydocstyle
+  "DTZ",   # flake8-datetimez
+  "E",     # pycodestyle errors
+  "EM",    # flake8-errmsg
+  "F",     # pyflakes
+  "FBT",   # flake8-boolean-trap
+  "G",     # flake8-logging-format
+  "I",     # isort
+  "ICN",   # flake8-import-conventions
+  "INP",   # flake8-no-pep420
+  "INT",   # flake8-gettext
+  "ISC",   # flake8-implicit-str-concat
+  "LOG",   # flake8-logging
+  "N",     # pep8-naming
+  "PERF",  # perflint
+  "PGH",   # pygrep-hooks
+  "PIE",   # flake8-pie
+  "PL",    # pylint
+  "PT",    # flake8-pytest-style
+  "PTH",   # flake8-use-pathlib
+  "PYI",   # flake8-pyi
+  "Q",     # flake8-quotes
+  "RET",   # flake8-return
+  "RSE",   # flake8-raise
+  "RUF",   # ruff-specific rules
+  "S",     # flake8-bandit
+  "SIM",   # flake8-simplify
+  "SLF",   # flake8-self
+  "SLOT",  # flake8-slots
+  "T10",   # flake8-debugger
+  "T20",   # flake8-print
+  "TCH",   # flake8-type-checking
+  "TID",   # flake8-tidy-imports
+  "TRY",   # tryceratops
+  "UP",    # pyupgrade
+  "W",     # pycodestyle warnings
+  "YTT",   # flake8-2020
+]
+
+ignore = [
+  "COM812",  # incompatible with ruff formatter
+  "ISC001",  # incompatible with ruff formatter
+  "D203",    # one-blank-line-before-class — conflicts with D211
+  "D213",    # multi-line-summary-second-line — conflicts with D212
+  "PLR0913", # too many arguments — HA config flows routinely exceed this
+  "PLR2004", # magic values — HA code uses status codes inline a lot
+  "TRY003",  # long exception messages — pragmatic for user-facing errors
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+  "D",     # docstrings optional in tests
+  "S101",  # assert is fine in tests
+  "PLR2004", # magic values ok in tests
+  "SLF001",  # private member access ok in tests
+  "ARG001",  # fixture args often unused
+  "ARG002",
+  "FBT001",
+  "FBT002",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.isort]
+known-first-party = ["custom_components.healthpush"]
+combine-as-imports = true
+force-sort-within-sections = true
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
+
+# ──────────────────────────────────────────────────────────────────────
+# mypy — strict mode
+# ──────────────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_unreachable = true
+warn_redundant_casts = true
+disallow_untyped_decorators = true
+no_implicit_reexport = true
+pretty = true
+show_error_codes = true
+show_error_context = true
+plugins = []
+exclude = ["tests/.*"]
+
+# HA core and pytest-homeassistant-custom-component lack complete types
+# — tolerate that without masking real issues in our code.
+[[tool.mypy.overrides]]
+module = [
+  "homeassistant.*",
+  "pytest_homeassistant_custom_component.*",
+  "voluptuous.*",
+]
+ignore_missing_imports = true
+
+# ──────────────────────────────────────────────────────────────────────
+# bandit — security linter
+# ──────────────────────────────────────────────────────────────────────
+[tool.bandit]
+targets = ["custom_components"]
+exclude_dirs = ["tests", ".venv", "venv", "__pycache__"]
+# B101: assert_used — our code doesn't use asserts in prod paths.
+# B404/B603: subprocess — HA integrations never shell out.
+skips = []
+
+# ──────────────────────────────────────────────────────────────────────
+# pytest + coverage
+# ──────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = [
+  "-ra",
+  "--strict-markers",
+  "--strict-config",
+  "--cov=custom_components/healthpush",
+  "--cov-report=term-missing",
+  "--cov-report=xml:coverage.xml",
+  "--cov-branch",
+]
+filterwarnings = [
+  "error",
+  "ignore::DeprecationWarning:homeassistant.*",
+  "ignore::DeprecationWarning:voluptuous.*",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["custom_components/healthpush"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+# Initial floor. Raise to ≥85% once the core test work lands.
+fail_under = 60
+show_missing = true
+skip_covered = false
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError",
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+]

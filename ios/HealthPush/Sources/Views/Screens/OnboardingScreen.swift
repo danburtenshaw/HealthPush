@@ -1,11 +1,10 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - OnboardingScreen
 
 /// First-run onboarding flow focused on trust, permissions, and activation.
 struct OnboardingScreen: View {
-
     @Environment(AppState.self) private var appState
     @Environment(SyncEngine.self) private var syncEngine
     @Environment(DestinationManager.self) private var destinationManager
@@ -77,10 +76,12 @@ struct OnboardingScreen: View {
                     .foregroundStyle(.white)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("No accounts. No subscriptions. No HealthPush cloud. Your iPhone sends data directly to the destinations you configure.")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.9))
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "No accounts. No subscriptions. No HealthPush cloud. Your iPhone sends data directly to the destinations you configure."
+                )
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.9))
+                .fixedSize(horizontal: false, vertical: true)
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -259,8 +260,7 @@ struct OnboardingScreen: View {
 
 private extension View {
     func sectionCardStyle() -> some View {
-        self
-            .padding(20)
+        padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }

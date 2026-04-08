@@ -1,0 +1,23 @@
+---
+extends: default
+
+rules:
+  line-length:
+    max: 200
+    level: warning
+  document-start:
+    present: false
+  truthy:
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+
+ignore: |
+  .local/
+  .build/
+  DerivedData/
+  ios/HealthPush/HealthPush.xcodeproj/

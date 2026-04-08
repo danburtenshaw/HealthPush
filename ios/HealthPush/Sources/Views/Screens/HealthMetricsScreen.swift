@@ -7,7 +7,6 @@ import SwiftUI
 /// Metrics are grouped by category (Activity, Body, Vitals, Sleep, Nutrition)
 /// with toggles for each individual metric and category-level select/deselect.
 struct HealthMetricsScreen: View {
-
     // MARK: Properties
 
     @Binding var selectedMetrics: Set<HealthMetricType>
@@ -70,7 +69,7 @@ struct HealthMetricsScreen: View {
     @ViewBuilder
     private func categoryHeader(for category: HealthMetricCategory) -> some View {
         let metrics = HealthMetricType.metrics(for: category)
-        let selectedCount = metrics.filter { selectedMetrics.contains($0) }.count
+        let selectedCount = metrics.count(where: { selectedMetrics.contains($0) })
         let isExpanded = expandedCategories.contains(category)
 
         Button {

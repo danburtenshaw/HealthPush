@@ -5,15 +5,14 @@ import SwiftUI
 /// A prominent card that displays the current sync status, last sync time,
 /// and next scheduled sync with animated visual feedback.
 struct SyncStatusCard: View {
-
     // MARK: Properties
 
     let isSyncing: Bool
     let lastSyncTime: String
     let dataPointsSyncedToday: Int
     let totalSyncsCompleted: Int
-    var isSyncOverdue: Bool = false
-    var hasSyncIssues: Bool = false
+    var isSyncOverdue = false
+    var hasSyncIssues = false
 
     @State private var pulseScale: CGFloat = 1.0
 
@@ -47,7 +46,6 @@ struct SyncStatusCard: View {
 
                 Divider()
                     .frame(height: 40)
-
 
                 StatItem(
                     title: "Points Today",
@@ -84,7 +82,6 @@ struct SyncStatusCard: View {
 
     // MARK: Subviews
 
-    @ViewBuilder
     private var statusIcon: some View {
         ZStack {
             Circle()
@@ -99,7 +96,7 @@ struct SyncStatusCard: View {
                     .onAppear {
                         withAnimation(
                             .easeInOut(duration: 1.0)
-                            .repeatForever(autoreverses: true)
+                                .repeatForever(autoreverses: true)
                         ) {
                             pulseScale = 1.4
                         }
@@ -176,7 +173,6 @@ struct SyncStatusCard: View {
 
 /// A small stat display used within the SyncStatusCard.
 private struct StatItem: View {
-
     let title: String
     let value: String
     let icon: String

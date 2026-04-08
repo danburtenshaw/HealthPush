@@ -4,23 +4,25 @@ import SwiftData
 // MARK: - DestinationType
 
 /// The kind of sync destination.
-enum DestinationType: String, Codable, Sendable, CaseIterable, Identifiable {
+enum DestinationType: String, Codable, CaseIterable, Identifiable {
     case homeAssistant = "Home Assistant"
     case s3 = "Amazon S3"
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var displayName: String {
         switch self {
-        case .homeAssistant: return "Home Assistant"
-        case .s3: return "S3-Compatible Storage"
+        case .homeAssistant: "Home Assistant"
+        case .s3: "S3-Compatible Storage"
         }
     }
 
     var symbolName: String {
         switch self {
-        case .homeAssistant: return "house.fill"
-        case .s3: return "cloud.fill"
+        case .homeAssistant: "house.fill"
+        case .s3: "cloud.fill"
         }
     }
 }
@@ -33,7 +35,6 @@ enum DestinationType: String, Codable, Sendable, CaseIterable, Identifiable {
 /// one of these records.
 @Model
 final class DestinationConfig {
-
     /// Unique identifier for this destination configuration.
     var id: UUID
 
@@ -70,28 +71,28 @@ final class DestinationConfig {
     // MARK: S3-Specific Fields
 
     /// AWS region for S3 destinations (e.g. "us-east-1").
-    var s3Region: String = ""
+    var s3Region = ""
 
     /// AWS secret access key for S3 destinations.
-    var s3SecretAccessKey: String = ""
+    var s3SecretAccessKey = ""
 
     /// Keychain entry name for the S3 secret access key.
     var s3SecretAccessKeyKeychainKey: String?
 
     /// Path prefix within the S3 bucket (e.g. "health/data").
-    var s3PathPrefix: String = ""
+    var s3PathPrefix = ""
 
     /// Optional custom endpoint for S3-compatible storage.
-    var s3Endpoint: String = ""
+    var s3Endpoint = ""
 
     /// Raw value of the export format for S3 destinations.
-    var s3ExportFormatRaw: String = "json"
+    var s3ExportFormatRaw = "json"
 
     /// Raw value of the sync frequency for this destination (e.g. "1hr").
-    var syncFrequencyRaw: String = "1hr"
+    var syncFrequencyRaw = "1hr"
 
     /// Raw value of the sync start date option (e.g. "last7Days").
-    var syncStartDateOptionRaw: String = "last7Days"
+    var syncStartDateOptionRaw = "last7Days"
 
     /// Custom start date for syncing (only used when syncStartDateOptionRaw == "custom").
     var syncStartDateCustom: Date?
@@ -99,7 +100,7 @@ final class DestinationConfig {
     /// Whether this destination needs a full (non-incremental) sync.
     /// True on creation and when sync start date changes.
     /// Set to false after a successful full sync.
-    var needsFullSync: Bool = true
+    var needsFullSync = true
 
     // MARK: Computed Properties
 
@@ -164,14 +165,14 @@ final class DestinationConfig {
     /// Whether an API token is stored for this destination.
     var hasStoredAPIToken: Bool {
         get throws {
-            !(try resolvedAPIToken).isEmpty
+            try !resolvedAPIToken.isEmpty
         }
     }
 
     /// Whether an S3 secret access key is stored for this destination.
     var hasStoredS3SecretAccessKey: Bool {
         get throws {
-            !(try resolvedS3SecretAccessKey).isEmpty
+            try !resolvedS3SecretAccessKey.isEmpty
         }
     }
 
@@ -194,22 +195,22 @@ final class DestinationConfig {
         s3Endpoint: String = "",
         s3ExportFormat: ExportFormat = .json
     ) {
-        self.id = UUID()
+        id = UUID()
         self.name = name
-        self.typeRaw = destinationType.rawValue
-        self.isEnabled = true
+        typeRaw = destinationType.rawValue
+        isEnabled = true
         self.baseURL = baseURL
         self.apiToken = apiToken
-        self.apiTokenKeychainKey = nil
-        self.enabledMetricRawValues = enabledMetrics.map(\.rawValue)
-        self.createdAt = .now
-        self.modifiedAt = .now
+        apiTokenKeychainKey = nil
+        enabledMetricRawValues = enabledMetrics.map(\.rawValue)
+        createdAt = .now
+        modifiedAt = .now
         self.s3Region = s3Region
         self.s3SecretAccessKey = s3SecretAccessKey
-        self.s3SecretAccessKeyKeychainKey = nil
+        s3SecretAccessKeyKeychainKey = nil
         self.s3PathPrefix = s3PathPrefix
         self.s3Endpoint = s3Endpoint
-        self.s3ExportFormatRaw = s3ExportFormat.rawValue
+        s3ExportFormatRaw = s3ExportFormat.rawValue
     }
 
     // MARK: Secret Storage

@@ -72,6 +72,28 @@ python -m pytest
 - **Python**: VS Code with the Ruff extension, or any editor with ruff integration
 - **Markdown**: Any editor with a markdown preview
 
+### Local Git Hooks (optional)
+
+HealthPush ships a [`lefthook`](https://github.com/evilmartian/lefthook) config at `.lefthook.yml`. It runs the same checks CI uses, but on your staged files before you commit — `swiftformat`, `swiftlint`, `gitleaks`, `shellcheck`, `ruff`, `markdownlint`, and the third-party-deps guard.
+
+Hooks are **opt-in**. CI re-runs everything on every push, so skipping them is never a shortcut past CI.
+
+```bash
+# Install lefthook and the tools it calls
+brew install lefthook swiftformat swiftlint gitleaks shellcheck markdownlint-cli
+
+# Wire lefthook into this clone's .git/hooks
+lefthook install
+
+# Run every pre-commit hook against the whole tree (useful after pulling)
+lefthook run pre-commit --all-files
+
+# Turn it off
+lefthook uninstall
+```
+
+If you don't want local hooks, just don't install lefthook — nothing else depends on it.
+
 ## Project Structure
 
 ```
@@ -134,27 +156,66 @@ guard let destination = selectedDestination else { return }
 - Type hints on all function signatures
 - Docstrings on all public functions and classes
 
-### Commit Messages
+### Commit Messages — Conventional Commits
 
-Use imperative mood, keep them concise:
+HealthPush uses [Conventional Commits](https://www.conventionalcommits.org/) on **PR titles**. The PR title becomes the commit on `main` (squash-merge only). `release-please` parses commit history to open release PRs automatically, so the format matters.
 
+Format:
+
+```text
+<type>(<scope>): <Subject>
 ```
-# Good
-Add background sync scheduler
-Fix webhook authentication header
-Update heart rate sensor icon
 
-# Bad
-Added background sync scheduler
-Fixing the webhook auth
-updated icon
+**Valid types:**
+
+| Type       | Meaning                                                    |
+|------------|------------------------------------------------------------|
+| `feat`     | New user-visible functionality                             |
+| `fix`      | Bug fix                                                    |
+| `perf`     | Performance improvement                                    |
+| `refactor` | Code change that does not add functionality or fix a bug   |
+| `docs`     | Documentation only                                         |
+| `test`     | Test additions or corrections                              |
+| `chore`    | Routine maintenance, tooling, configuration                |
+| `ci`       | CI/CD pipeline changes                                     |
+| `build`    | Build system, packaging, Fastlane                          |
+| `security` | Security-related change or hardening                       |
+| `revert`   | Revert of a previous commit                                |
+
+**Valid scopes** (optional but recommended):
+
+`ios`, `ha`, `storage-core`, `destinations`, `sync`, `docs`, `ci`, `deps`, `release`.
+
+**Subject rules:**
+
+- Starts with an uppercase letter.
+- Imperative mood: *"Add background sync scheduler"*, not *"Added"* or *"Adding"*.
+- No trailing period.
+- Under ~70 characters.
+
+**Examples:**
+
+```text
+feat(destinations): Add REST webhook destination
+fix(sync): Handle DST transition in Calendar.date(byAdding:)
+refactor(ios): Split SyncEngine.performSync into stage functions
+docs(ha): Document LAN HTTP policy and private-IP allowlist
+ci: Bump codeql-action to v3.29.4
+security(ha): Require webhook secret at registration time
+feat(destinations)!: Lock v1 schema layout — breaking change
 ```
+
+**Breaking changes:** append `!` after the type/scope, and add a `BREAKING CHANGE:` footer in the PR body. `release-please` will bump the MAJOR version.
+
+**Enforcement:** the `Lint PR Title` workflow (`.github/workflows/commitlint.yml`) validates the PR title on every pull request. CI fails if the title does not conform.
+
+**Work in progress:** PR titles prefixed with `WIP:` or `[WIP]` skip validation. Remove the prefix before marking ready for review.
 
 ### Branch Naming
 
-Use prefixed branch names:
+Use prefixed branch names (style only — release-please does not parse them):
 
-- `feature/csv-export-destination`
+- `feat/csv-export-destination`
 - `fix/background-sync-timing`
 - `docs/update-setup-guide`
 

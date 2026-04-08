@@ -8,7 +8,7 @@ enum KeychainError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unexpectedStatus(let status):
+        case let .unexpectedStatus(status):
             if let message = SecCopyErrorMessageString(status, nil) as String? {
                 return "Keychain error: \(message)"
             }
@@ -19,8 +19,7 @@ enum KeychainError: LocalizedError {
 
 // MARK: - KeychainService
 
-struct KeychainService {
-
+enum KeychainService {
     private static let service = "app.healthpush.destinations"
     private static let missingEntitlementStatus: OSStatus = -34018
     private static let fallbackStore = InMemorySecretStore()
@@ -121,7 +120,6 @@ struct KeychainService {
 // MARK: - InMemorySecretStore
 
 private final class InMemorySecretStore: @unchecked Sendable {
-
     private let lock = NSLock()
     private var values: [String: String] = [:]
 

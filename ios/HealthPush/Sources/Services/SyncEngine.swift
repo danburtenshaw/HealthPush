@@ -1,12 +1,12 @@
 import Foundation
 import Observation
-import SwiftData
 import os
+import SwiftData
 
 // MARK: - SyncError
 
 /// Errors that can occur during the sync process.
-enum SyncError: LocalizedError, Sendable {
+enum SyncError: LocalizedError {
     case noDestinations
     case healthKitUnavailable
     case allDestinationsFailed([String])
@@ -14,11 +14,11 @@ enum SyncError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .noDestinations:
-            return "No sync destinations are configured and enabled."
+            "No sync destinations are configured and enabled."
         case .healthKitUnavailable:
-            return "HealthKit is not available."
-        case .allDestinationsFailed(let names):
-            return "All destinations failed: \(names.joined(separator: ", "))"
+            "HealthKit is not available."
+        case let .allDestinationsFailed(names):
+            "All destinations failed: \(names.joined(separator: ", "))"
         }
     }
 }
@@ -26,7 +26,7 @@ enum SyncError: LocalizedError, Sendable {
 // MARK: - SyncDestinationError
 
 /// A sendable record of a destination sync failure.
-struct SyncDestinationError: Sendable {
+struct SyncDestinationError {
     let destinationName: String
     let errorDescription: String
 }
@@ -34,7 +34,7 @@ struct SyncDestinationError: Sendable {
 // MARK: - SyncResult
 
 /// The result of a sync operation.
-struct SyncResult: Sendable {
+struct SyncResult {
     let dataPointCount: Int
     let successfulDestinations: Int
     let failedDestinations: Int
@@ -50,7 +50,6 @@ struct SyncResult: Sendable {
 /// destination manager, and SwiftData persistence.
 @MainActor
 final class SyncEngine: Observable {
-
     // MARK: Properties
 
     private let logger = Logger(subsystem: "app.healthpush", category: "SyncEngine")
@@ -61,10 +60,10 @@ final class SyncEngine: Observable {
 
     init() {
         do {
-            self.healthKitManager = try HealthKitManager()
+            healthKitManager = try HealthKitManager()
         } catch {
             logger.warning("HealthKit not available: \(error.localizedDescription)")
-            self.healthKitManager = nil
+            healthKitManager = nil
         }
     }
 
@@ -94,7 +93,8 @@ final class SyncEngine: Observable {
         )
 
         guard let destinations = try? modelContext.fetch(descriptor),
-              !destinations.isEmpty else {
+              !destinations.isEmpty
+        else {
             logger.warning("No enabled destinations found")
             return SyncResult(
                 dataPointCount: 0,
@@ -112,7 +112,10 @@ final class SyncEngine: Observable {
                 successfulDestinations: 0,
                 failedDestinations: 0,
                 duration: Date().timeIntervalSince(startTime),
-                errors: [SyncDestinationError(destinationName: "HealthKit", errorDescription: SyncError.healthKitUnavailable.localizedDescription)]
+                errors: [SyncDestinationError(
+                    destinationName: "HealthKit",
+                    errorDescription: SyncError.healthKitUnavailable.localizedDescription
+                )]
             )
         }
 
@@ -134,7 +137,8 @@ final class SyncEngine: Observable {
             if isBackground,
                !config.needsFullSync,
                let lastSynced = config.lastSyncedAt,
-               Date.now.timeIntervalSince(lastSynced) < config.syncFrequency.timeInterval * 0.9 {
+               Date.now.timeIntervalSince(lastSynced) < config.syncFrequency.timeInterval * 0.9
+            {
                 logger.info("Skipping \(config.name) — last synced \(lastSynced), interval not yet elapsed")
                 continue
             }
@@ -143,26 +147,25 @@ final class SyncEngine: Observable {
             // Home Assistant only needs data since last sync (sends latest value per metric).
             // S3 always re-syncs 3 days to catch delayed Apple Watch data —
             // the merge layer deduplicates by UUID so re-syncing is safe and idempotent.
-            let lookbackDate: Date
-            switch config.destinationType {
+            let lookbackDate: Date = switch config.destinationType {
             case .homeAssistant:
                 if let lastSynced = config.lastSyncedAt {
-                    lookbackDate = lastSynced
+                    lastSynced
                 } else {
-                    lookbackDate = Calendar.current.date(byAdding: .hour, value: -24, to: .now) ?? .now
+                    Calendar.current.date(byAdding: .hour, value: -24, to: .now) ?? .now
                 }
             case .s3:
                 if config.needsFullSync {
                     // Full sync: query from the configured start date
-                    lookbackDate = config.resolvedSyncStartDate
+                    config.resolvedSyncStartDate
                 } else {
                     // Incremental: 3-day lookback for delayed Apple Watch data
-                    lookbackDate = Calendar.current.date(byAdding: .day, value: -3, to: .now) ?? .now
+                    Calendar.current.date(byAdding: .day, value: -3, to: .now) ?? .now
                 }
             }
 
             // Split metrics: cumulative use statistics aggregation, discrete use raw samples
-            let cumulativeMetrics = config.enabledMetrics.filter { $0.isCumulative }
+            let cumulativeMetrics = config.enabledMetrics.filter(\.isCumulative)
             let discreteMetrics = config.enabledMetrics.subtracting(cumulativeMetrics)
 
             var dataPoints: [HealthDataPoint] = []
@@ -184,12 +187,11 @@ final class SyncEngine: Observable {
                 // For HA, query from start-of-today so the value represents the
                 // full day's total ("8,432 steps today"), not a partial delta.
                 // For S3, use the same lookback as discrete metrics.
-                let cumulativeLookback: Date
-                switch config.destinationType {
+                let cumulativeLookback: Date = switch config.destinationType {
                 case .homeAssistant:
-                    cumulativeLookback = Calendar.current.startOfDay(for: .now)
+                    Calendar.current.startOfDay(for: .now)
                 case .s3:
-                    cumulativeLookback = lookbackDate
+                    lookbackDate
                 }
 
                 let aggregated = await healthKitManager.queryDailyStatistics(

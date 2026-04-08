@@ -45,7 +45,8 @@
       {
         "group": "Project",
         "pages": [
-          "contributing"
+          "contributing",
+          "versioning"
         ]
       }
     ]

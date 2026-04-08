@@ -1,12 +1,10 @@
-import Testing
 import Foundation
+import Testing
 @testable import HealthPush
 
 // MARK: - SyncFrequencyTests
 
-@Suite("SyncFrequency")
 struct SyncFrequencyTests {
-
     @Test("All cases are present")
     func allCases() {
         #expect(SyncFrequency.allCases.count == 7)

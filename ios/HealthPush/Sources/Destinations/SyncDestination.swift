@@ -7,7 +7,7 @@ import Foundation
 /// Destinations report how many data points were processed vs. how many
 /// were actually new or updated. This lets the UI show meaningful counts
 /// rather than the total HealthKit query size.
-struct SyncStats: Sendable {
+struct SyncStats {
     /// Total data points the destination received.
     let processedCount: Int
 
@@ -31,7 +31,6 @@ struct SyncStats: Sendable {
 /// 4. Add a new case to `DestinationType`.
 /// 5. Add configuration UI in `Views/Screens/`.
 protocol SyncDestination: Identifiable, Sendable {
-
     /// Unique identifier for this destination instance.
     var id: UUID { get }
 

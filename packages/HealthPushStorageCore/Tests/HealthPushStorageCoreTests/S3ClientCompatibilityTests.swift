@@ -1,7 +1,6 @@
 import Testing
 @testable import HealthPushStorageCore
 
-@Suite("S3ClientCompatibility")
 struct S3ClientCompatibilityTests {
     @Test("Custom endpoints normalize trailing slashes")
     func normalizedEndpoint() {
