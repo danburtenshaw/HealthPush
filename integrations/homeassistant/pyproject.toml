@@ -121,7 +121,10 @@ docstring-code-format = true
 # mypy — strict mode
 # ──────────────────────────────────────────────────────────────────────
 [tool.mypy]
-python_version = "3.12"
+# Match the CI Python (3.13) so mypy can parse HA 2026.x's PEP 696
+# type parameter default syntax (e.g. `class ConfigEntry[_DataT = Any]`),
+# which mypy treats as a hard syntax error under earlier targets.
+python_version = "3.13"
 strict = true
 warn_unused_ignores = true
 warn_unreachable = true
