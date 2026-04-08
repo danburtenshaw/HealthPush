@@ -1,6 +1,13 @@
 # HealthPush label taxonomy.
 # Synced by .github/workflows/label-sync.yml on push to main.
 # Add/remove here, not in the GitHub UI.
+#
+# Rules:
+#   - Add a "destination: <name>" label only when the destination has shipped.
+#     Speculative destinations live in destination request issues, not in the
+#     label taxonomy.
+#   - Scope labels are assigned automatically by .github/workflows/labeler.yml
+#     based on which paths a PR touches — see .github/labeler.yml for the map.
 
 # ── Type ──────────────────────────────────────────────────────────
 - name: bug
@@ -35,6 +42,8 @@
   description: Performance improvement or regression
 
 # ── Scope ─────────────────────────────────────────────────────────
+# Applied automatically by the path-based labeler. The release train is
+# derived from the scope, so no separate "release: *" labels.
 - name: "scope: ios"
   color: "1d76db"
   description: iOS app
@@ -103,18 +112,11 @@
   color: "008672"
   description: Extra attention is needed
 
-# ── Release train ─────────────────────────────────────────────────
-- name: "release: ios"
-  color: "006b75"
-  description: Part of the iOS release train
-- name: "release: ha"
-  color: "006b75"
-  description: Part of the Home Assistant release train
-- name: "release: storage-core"
-  color: "006b75"
-  description: Part of the storage-core release train
-
-# ── Destination proposals ────────────────────────────────────────
+# ── Destinations ──────────────────────────────────────────────────
+# Only real, shipped destinations get their own label. Proposals live under
+# "destination: proposed"; accepted proposals transition to "destination:
+# accepted" until the implementation lands, at which point a per-destination
+# label is added here.
 - name: "destination: proposed"
   color: "bfd4f2"
   description: A new destination is proposed but not yet accepted
@@ -123,20 +125,10 @@
   description: A new destination is accepted for implementation
 - name: "destination: s3"
   color: "c5def5"
+  description: Changes to the S3 destination
 - name: "destination: homeassistant"
   color: "c5def5"
-- name: "destination: rest"
-  color: "c5def5"
-- name: "destination: google-drive"
-  color: "c5def5"
-- name: "destination: google-sheets"
-  color: "c5def5"
-- name: "destination: mqtt"
-  color: "c5def5"
-- name: "destination: webdav"
-  color: "c5def5"
-- name: "destination: csv"
-  color: "c5def5"
+  description: Changes to the Home Assistant destination
 
 # ── Automation ────────────────────────────────────────────────────
 - name: dependencies

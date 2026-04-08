@@ -1,0 +1,134 @@
+# HealthPush path-based auto-labeling config.
+# Applied by .github/workflows/labeler.yml on every pull request.
+# Reference: https://github.com/actions/labeler
+#
+# Rules map changed paths to labels. A PR gets every label whose
+# matcher hits at least one of the PR's changed files.
+
+# ── Scope labels ──────────────────────────────────────────────────
+"scope: ios":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "ios/**"
+          - "fastlane/**"
+          - ".github/workflows/ios-ci.yml"
+          - ".github/workflows/release-ios.yml"
+
+"scope: ha":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "integrations/homeassistant/**"
+          - ".github/workflows/ha-integration-ci.yml"
+          - ".github/workflows/release-ha.yml"
+
+"scope: storage-core":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/HealthPushStorageCore/**"
+          - ".github/workflows/s3-core-ci.yml"
+
+"scope: destinations":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "ios/HealthPush/Sources/Destinations/**"
+          - "ios/HealthPush/Sources/Models/DestinationConfig.swift"
+          - "docs/adding-a-destination.md"
+          - "docs/setup-home-assistant.mdx"
+          - "docs/setup-amazon-s3.mdx"
+
+"scope: sync":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "ios/HealthPush/Sources/Services/SyncEngine.swift"
+          - "ios/HealthPush/Sources/Services/BackgroundSyncScheduler.swift"
+          - "ios/HealthPush/Sources/Services/HealthDataExporter.swift"
+          - "ios/HealthPush/Sources/Services/HealthKitManager.swift"
+          - "ios/HealthPush/Sources/Models/SyncRecord.swift"
+          - "ios/HealthPush/Sources/Models/SyncFrequency.swift"
+          - "ios/HealthPush/Sources/Models/SyncStartDateOption.swift"
+          - "docs/sync-behavior.mdx"
+
+"scope: docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "README.md"
+          - "CONTRIBUTING.md"
+          - "GOVERNANCE.md"
+          - "MAINTAINERS.md"
+          - "SUPPORT.md"
+          - "SECURITY.md"
+          - "CODE_OF_CONDUCT.md"
+          - "AGENTS.md"
+          - "CLAUDE.md"
+          - "**/*.md"
+          - "**/*.mdx"
+
+"scope: release":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "fastlane/**"
+          - "Gemfile"
+          - "Gemfile.lock"
+          - "release-please-config.json"
+          - ".release-please-manifest.json"
+          - ".github/workflows/release-*.yml"
+          - "docs/versioning.mdx"
+
+# ── Type labels ───────────────────────────────────────────────────
+# The Conventional Commit type in the PR title is the primary source of
+# truth here; these are path-based fallbacks to make sure type labels get
+# applied even when the type isn't auto-synced from the title.
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "**/*.md"
+          - "**/*.mdx"
+
+test:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "ios/HealthPush/Tests/**"
+          - "packages/HealthPushStorageCore/Tests/**"
+          - "integrations/homeassistant/tests/**"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/**"
+          - ".github/dependabot.yml"
+          - ".github/labels.yml"
+          - ".github/labeler.yml"
+          - "scripts/**"
+          - ".editorconfig"
+          - ".markdownlint.json"
+          - ".yamllint.yaml"
+          - ".swiftlint.yml"
+          - ".swiftformat"
+          - ".lefthook.yml"
+          - "integrations/homeassistant/pyproject.toml"
+          - "integrations/homeassistant/requirements_dev.txt"
+
+# ── Destination-specific labels ───────────────────────────────────
+"destination: s3":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "ios/HealthPush/Sources/Destinations/S3Destination.swift"
+          - "ios/HealthPush/Sources/Services/S3Client.swift"
+          - "ios/HealthPush/Sources/Services/S3Signer.swift"
+          - "ios/HealthPush/Sources/Services/S3SyncService.swift"
+          - "ios/HealthPush/Sources/Views/Screens/S3SetupScreen.swift"
+          - "packages/HealthPushStorageCore/**"
+          - "docs/setup-amazon-s3.mdx"
+          - ".github/workflows/s3-core-ci.yml"
+
+"destination: homeassistant":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "ios/HealthPush/Sources/Destinations/HomeAssistantDestination.swift"
+          - "ios/HealthPush/Sources/Views/Screens/HomeAssistantSetupScreen.swift"
+          - "integrations/homeassistant/**"
+          - "docs/setup-home-assistant.mdx"
+          - ".github/workflows/ha-integration-ci.yml"
+          - ".github/workflows/release-ha.yml"
