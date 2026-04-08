@@ -8,14 +8,13 @@ on:
     types: [opened, edited, synchronize, reopened]
 
 permissions:
-  # amannn/action-semantic-pull-request reads the PR title, and — because
-  # `wip: true` is set — posts a commit status via the Statuses API when
-  # the title is WIP. That requires `statuses: write`, NOT
-  # `pull-requests: write`; the action's README is misleading. Without
-  # `statuses: write` the action fails with the confusing error
-  # "Resource not accessible by integration".
+  # Minimum required for amannn/action-semantic-pull-request to read the
+  # PR title. The `wip: true` feature is intentionally disabled below
+  # because HealthPush is a public repo, which means GitHub's native
+  # draft PRs cover the WIP use case. Draft PRs don't need a workflow
+  # to post pending statuses, so we avoid the extra `statuses: write`
+  # permission that `wip: true` would otherwise require.
   pull-requests: read
-  statuses: write
 
 concurrency:
   group: commitlint-${{ github.ref }}
@@ -67,5 +66,7 @@ jobs:
           subjectPatternError: |
             The subject "{subject}" found in the pull request title "{title}"
             should start with an uppercase letter and not end with a period.
-          wip: true
+          # wip: true intentionally omitted. HealthPush is public so
+          # contributors can use GitHub's native draft PR feature
+          # instead of the `[WIP]` title prefix workaround.
           validateSingleCommit: false
