@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from homeassistant.components.webhook import async_generate_url
@@ -11,8 +10,6 @@ from homeassistant.helpers import config_validation as cv
 import voluptuous as vol
 
 from .const import CONF_WEBHOOK_SECRET, DOMAIN
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class HealthPushConfigFlow(ConfigFlow, domain=DOMAIN):

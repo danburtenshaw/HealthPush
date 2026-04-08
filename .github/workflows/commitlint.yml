@@ -8,7 +8,10 @@ on:
     types: [opened, edited, synchronize, reopened]
 
 permissions:
-  pull-requests: read
+  # amannn/action-semantic-pull-request needs `write` to manage the WIP
+  # label (wip: true). Read-only permission produces a confusing
+  # "Resource not accessible by integration" error on every run.
+  pull-requests: write
 
 concurrency:
   group: commitlint-${{ github.ref }}

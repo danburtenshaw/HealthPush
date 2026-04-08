@@ -19,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry[Any]) -> bool:
     """Set up HealthPush from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
@@ -46,7 +46,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry[Any]) -> bool:
     """Unload a HealthPush config entry."""
     # Tear down sensor platform first.
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
