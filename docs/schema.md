@@ -7,7 +7,7 @@ This document defines the frozen v1 data contract for HealthPush exports. Once a
 Each health data record contains the following fields:
 
 | Field | Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `schemaVersion` | string | Always `"1.0"` for this contract. |
 | `uuid` | string | HealthKit sample UUID or deterministic v5 UUID for aggregates. |
 | `metric.key` | string | Stable HealthPush key (e.g. `"heart_rate"`), uses `fileStem`. |
