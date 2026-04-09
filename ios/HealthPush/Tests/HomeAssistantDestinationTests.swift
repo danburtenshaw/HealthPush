@@ -32,9 +32,9 @@ struct HomeAssistantDestinationTests {
         HealthDataPoint(
             metricType: metricType,
             value: value,
-            unit: metricType.unitString,
-            timestamp: Date(timeIntervalSince1970: 1_700_000_000),
-            endTimestamp: Date(timeIntervalSince1970: 1_700_003_600),
+            unit: metricType.canonicalUnit,
+            startDate: Date(timeIntervalSince1970: 1_700_000_000),
+            endDate: Date(timeIntervalSince1970: 1_700_003_600),
             sourceName: "Test Device"
         )
     }
@@ -76,7 +76,7 @@ struct HomeAssistantDestinationTests {
 
     @Test("Sync succeeds with empty secret (no auth)")
     func emptySecretDoesNotThrow() async {
-        // An empty webhook secret is valid — it just means no X-Webhook-Secret header
+        // An empty webhook secret is valid -- it just means no X-Webhook-Secret header
         let config = makeConfig(webhookSecret: "")
         defer { try? config.deleteAllCredentials() }
 
@@ -157,37 +157,37 @@ struct HomeAssistantDestinationTests {
         let sleepPoints = [
             HealthDataPoint(
                 metricType: .sleepAnalysis,
-                value: 1.5,
-                unit: "hr",
-                timestamp: start,
-                endTimestamp: start.addingTimeInterval(90 * 60),
+                value: 5400,
+                unit: "s",
+                startDate: start,
+                endDate: start.addingTimeInterval(90 * 60),
                 sourceName: "Apple Watch",
                 categoryValue: HKCategoryValueSleepAnalysis.asleepCore.rawValue
             ),
             HealthDataPoint(
                 metricType: .sleepAnalysis,
-                value: 1.5,
-                unit: "hr",
-                timestamp: start.addingTimeInterval(60 * 60),
-                endTimestamp: start.addingTimeInterval(150 * 60),
+                value: 5400,
+                unit: "s",
+                startDate: start.addingTimeInterval(60 * 60),
+                endDate: start.addingTimeInterval(150 * 60),
                 sourceName: "Apple Watch",
                 categoryValue: HKCategoryValueSleepAnalysis.asleepREM.rawValue
             ),
             HealthDataPoint(
                 metricType: .sleepAnalysis,
-                value: 6.5,
-                unit: "hr",
-                timestamp: start.addingTimeInterval(150 * 60),
-                endTimestamp: start.addingTimeInterval(540 * 60),
+                value: 23400,
+                unit: "s",
+                startDate: start.addingTimeInterval(150 * 60),
+                endDate: start.addingTimeInterval(540 * 60),
                 sourceName: "Apple Watch",
                 categoryValue: HKCategoryValueSleepAnalysis.asleepDeep.rawValue
             ),
             HealthDataPoint(
                 metricType: .sleepAnalysis,
-                value: 9.5,
-                unit: "hr",
-                timestamp: start.addingTimeInterval(-30 * 60),
-                endTimestamp: start.addingTimeInterval(540 * 60),
+                value: 34200,
+                unit: "s",
+                startDate: start.addingTimeInterval(-30 * 60),
+                endDate: start.addingTimeInterval(540 * 60),
                 sourceName: "Apple Watch",
                 categoryValue: HKCategoryValueSleepAnalysis.inBed.rawValue
             )

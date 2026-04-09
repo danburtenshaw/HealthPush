@@ -46,7 +46,7 @@ struct HealthDataQueryResult {
 ///
 /// This actor serializes access to HKHealthStore and provides async methods
 /// for authorization, querying, and anchor-based incremental queries.
-actor HealthKitManager {
+actor HealthKitManager: HealthKitReading {
     // MARK: Properties
 
     private let healthStore: HKHealthStore
@@ -231,11 +231,12 @@ actor HealthKitManager {
                         id: aggregateID,
                         metricType: metric,
                         value: value,
-                        unit: metric.unitString,
-                        timestamp: dayStart,
-                        endTimestamp: dayEnd,
+                        unit: metric.canonicalUnit,
+                        startDate: dayStart,
+                        endDate: dayEnd,
                         sourceName: "HealthKit Aggregate",
-                        sourceBundleIdentifier: nil
+                        sourceBundleIdentifier: nil,
+                        aggregation: "sum"
                     ))
                 }
 
@@ -286,12 +287,13 @@ actor HealthKitManager {
                 id: sample.uuid,
                 metricType: metric,
                 value: sample.quantity.doubleValue(for: unit),
-                unit: metric.unitString,
-                timestamp: sample.startDate,
-                endTimestamp: sample.endDate,
+                unit: metric.canonicalUnit,
+                startDate: sample.startDate,
+                endDate: sample.endDate,
                 sourceName: sample.sourceRevision.source.name,
                 sourceBundleIdentifier: sample.sourceRevision.source.bundleIdentifier,
-                categoryValue: nil
+                categoryValue: nil,
+                aggregation: "raw"
             )
         }
     }
@@ -320,17 +322,18 @@ actor HealthKitManager {
         let samples = try await descriptor.result(for: healthStore)
 
         return samples.map { sample in
-            let durationHours = sample.endDate.timeIntervalSince(sample.startDate) / 3600.0
+            let durationSeconds = sample.endDate.timeIntervalSince(sample.startDate)
             return HealthDataPoint(
                 id: sample.uuid,
                 metricType: metric,
-                value: durationHours,
-                unit: metric.unitString,
-                timestamp: sample.startDate,
-                endTimestamp: sample.endDate,
+                value: durationSeconds,
+                unit: metric.canonicalUnit,
+                startDate: sample.startDate,
+                endDate: sample.endDate,
                 sourceName: sample.sourceRevision.source.name,
                 sourceBundleIdentifier: sample.sourceRevision.source.bundleIdentifier,
-                categoryValue: sample.value
+                categoryValue: sample.value,
+                aggregation: "raw"
             )
         }
     }

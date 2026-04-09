@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import Platform
 
-from .const import DOMAIN
+from .const import CONF_WEBHOOK_SECRET, DOMAIN
 from .webhook import register_webhook, unregister_webhook
 
 if TYPE_CHECKING:
@@ -31,6 +31,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry[Any]) -> boo
         "last_device_name": None,
     }
     hass.data[DOMAIN][entry.entry_id] = entry_data
+
+    # Warn about legacy installs that have no webhook secret configured.
+    secret: str = entry.data.get(CONF_WEBHOOK_SECRET, "")
+    if not secret:
+        _LOGGER.warning(
+            "HealthPush webhook for '%s' has no secret configured. "
+            "Re-add the integration with a secret for security.",
+            entry.title,
+        )
 
     # Register the webhook so the iOS app can start posting data.
     register_webhook(hass, entry)

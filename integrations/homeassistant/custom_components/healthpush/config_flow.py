@@ -44,7 +44,7 @@ class HealthPushConfigFlow(ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(
             {
                 vol.Required("name", default="iPhone"): str,
-                vol.Optional(CONF_WEBHOOK_SECRET, default=""): str,
+                vol.Required(CONF_WEBHOOK_SECRET): str,
             }
         )
 

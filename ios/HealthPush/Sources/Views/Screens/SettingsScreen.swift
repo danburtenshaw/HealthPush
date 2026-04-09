@@ -225,7 +225,7 @@ struct SettingsScreen: View {
         } header: {
             Text("About")
         } footer: {
-            Text("HealthPush is open source. Your health data is never shared with third parties.")
+            Text("HealthPush is open source. Your health data is never shared with third parties.\n\nDestination configurations are included in your iPhone's encrypted iCloud backup. Credentials (API keys, tokens) are stored in the Keychain and do not sync via backup \u{2014} you'll re-enter them if you restore to a new device.")
         }
     }
 

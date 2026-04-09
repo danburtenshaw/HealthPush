@@ -143,9 +143,10 @@ class HealthPushSensor(SensorEntity, RestoreEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Group all sensors under one device per config entry."""
+        device_name = str(self._entry.data.get("name", "HealthPush"))[:64]
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},
-            name=self._entry.data.get("name", "HealthPush"),
+            name=device_name,
             manufacturer="HealthPush",
             model="iOS App",
             entry_type=None,

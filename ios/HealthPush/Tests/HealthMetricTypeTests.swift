@@ -92,10 +92,32 @@ struct HealthMetricTypeTests {
         }
     }
 
-    @Test("All metrics have non-empty unit strings")
-    func unitStrings() {
+    @Test("All metrics have non-empty canonical units")
+    func canonicalUnits() {
         for metric in HealthMetricType.allCases {
-            #expect(!metric.unitString.isEmpty, "\(metric.rawValue) has empty unit string")
+            #expect(!metric.canonicalUnit.isEmpty, "\(metric.rawValue) has empty canonical unit")
+        }
+    }
+
+    @Test("All metrics have non-empty display units")
+    func displayUnits() {
+        for metric in HealthMetricType.allCases {
+            #expect(!metric.displayUnit.isEmpty, "\(metric.rawValue) has empty display unit")
+        }
+    }
+
+    @Test("All metrics have a valid metric kind")
+    func metricKinds() {
+        let validKinds: Set<String> = ["quantity", "cumulative", "category"]
+        for metric in HealthMetricType.allCases {
+            #expect(validKinds.contains(metric.metricKind), "\(metric.rawValue) has invalid metric kind: \(metric.metricKind)")
+        }
+    }
+
+    @Test("All metrics have non-empty HK identifier strings")
+    func hkIdentifierStrings() {
+        for metric in HealthMetricType.allCases {
+            #expect(!metric.hkIdentifierString.isEmpty, "\(metric.rawValue) has empty hkIdentifierString")
         }
     }
 

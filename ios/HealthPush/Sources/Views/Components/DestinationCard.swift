@@ -28,6 +28,18 @@ struct DestinationCard: View {
                 Text(config.name)
                     .font(.headline)
 
+                if config.needsReauth {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                        Text("Credentials needed")
+                            .font(.caption.weight(.medium))
+                    }
+                    .foregroundStyle(.orange)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Credentials needed. Tap to re-enter.")
+                }
+
                 HStack(spacing: 6) {
                     Circle()
                         .fill(config.isEnabled ? .green : .gray)
@@ -100,6 +112,9 @@ struct DestinationCard: View {
     private var accessibilitySummary: String {
         var parts: [String] = []
         parts.append("\(config.name), \(config.destinationType.displayName).")
+        if config.needsReauth {
+            parts.append("Credentials needed.")
+        }
         parts.append(config.isEnabled ? "Enabled" : "Disabled")
         parts.append("\(config.enabledMetrics.count) metrics.")
         parts.append("Frequency: \(config.syncFrequency.displayName).")

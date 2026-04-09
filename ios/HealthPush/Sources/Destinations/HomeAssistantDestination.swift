@@ -232,138 +232,36 @@ struct HomeAssistantDestination: SyncDestination {
     /// A user-configurable sensor label can be added in a future release.
     private static let deviceName = "HealthPush"
 
+    // MARK: - Delegated Payload Building
+
+    /// Delegates to ``HomeAssistantPayloadBuilder`` for backward compatibility.
     static func buildMetricPayloads(
         from data: [HealthDataPoint],
         enabledMetrics: Set<HealthMetricType>,
         formatter: ISO8601DateFormatter
     ) -> [[String: Any]] {
-        let grouped = Dictionary(grouping: data) { $0.metricType }
-        var metrics: [[String: Any]] = []
-
-        for (metricType, points) in grouped {
-            guard enabledMetrics.contains(metricType) else { continue }
-
-            if metricType == .sleepAnalysis {
-                if let sleepPayload = sleepPayload(from: points, formatter: formatter) {
-                    metrics.append(sleepPayload)
-                }
-                continue
-            }
-
-            guard let latest = points.max(by: { $0.timestamp < $1.timestamp }) else { continue }
-            metrics.append(metricPayload(for: latest, formatter: formatter))
-        }
-
-        return metrics.sorted {
-            ($0["type"] as? String ?? "") < ($1["type"] as? String ?? "")
-        }
+        HomeAssistantPayloadBuilder.buildMetricPayloads(
+            from: data,
+            enabledMetrics: enabledMetrics,
+            formatter: formatter
+        )
     }
 
+    /// Delegates to ``HomeAssistantPayloadBuilder`` for backward compatibility.
     static func sleepPayload(
         from points: [HealthDataPoint],
         formatter: ISO8601DateFormatter
     ) -> [String: Any]? {
-        let asleepIntervals = mergedSleepIntervals(from: points)
-        guard let firstInterval = asleepIntervals.first,
-              let lastInterval = asleepIntervals.last
-        else {
-            return nil
-        }
-
-        let totalHours = asleepIntervals.reduce(0.0) { partialResult, interval in
-            partialResult + interval.end.timeIntervalSince(interval.start) / 3600.0
-        }
-
-        let dateString = Self.sleepAggregateDateFormatter.string(from: lastInterval.end)
-        let aggregateID = HealthDataPoint.aggregateID(date: dateString, metric: .sleepAnalysis)
-
-        return [
-            "id": aggregateID.uuidString,
-            "type": HealthMetricType.sleepAnalysis.fileStem,
-            "value": (totalHours * 100).rounded() / 100,
-            "unit": HealthMetricType.sleepAnalysis.unitString,
-            "start_date": formatter.string(from: firstInterval.start),
-            "end_date": formatter.string(from: lastInterval.end)
-        ]
+        HomeAssistantPayloadBuilder.sleepPayload(from: points, formatter: formatter)
     }
 
+    /// Delegates to ``HomeAssistantPayloadBuilder`` for backward compatibility.
     static func mergedSleepIntervals(from points: [HealthDataPoint]) -> [(start: Date, end: Date)] {
-        let sorted = points
-            .filter(Self.isAsleepSample)
-            .map { (start: $0.timestamp, end: $0.endTimestamp) }
-            .filter { $0.end > $0.start }
-            .sorted { lhs, rhs in
-                if lhs.start == rhs.start {
-                    return lhs.end < rhs.end
-                }
-                return lhs.start < rhs.start
-            }
-
-        guard let first = sorted.first else { return [] }
-
-        var merged: [(start: Date, end: Date)] = [first]
-        for interval in sorted.dropFirst() {
-            let previous = merged[merged.count - 1]
-            if interval.start <= previous.end {
-                merged[merged.count - 1].end = max(previous.end, interval.end)
-            } else {
-                merged.append(interval)
-            }
-        }
-
-        return merged
+        HomeAssistantPayloadBuilder.mergedSleepIntervals(from: points)
     }
 
+    /// Delegates to ``HomeAssistantPayloadBuilder`` for backward compatibility.
     static func isAsleepSample(_ point: HealthDataPoint) -> Bool {
-        guard point.metricType == .sleepAnalysis else { return true }
-        guard let categoryValue = point.categoryValue else { return true }
-
-        switch categoryValue {
-        case HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue,
-             HKCategoryValueSleepAnalysis.asleepCore.rawValue,
-             HKCategoryValueSleepAnalysis.asleepDeep.rawValue,
-             HKCategoryValueSleepAnalysis.asleepREM.rawValue:
-            return true
-        default:
-            return false
-        }
+        HomeAssistantPayloadBuilder.isAsleepSample(point)
     }
-
-    private static func metricPayload(
-        for point: HealthDataPoint,
-        formatter: ISO8601DateFormatter
-    ) -> [String: Any] {
-        var displayValue = point.value
-        switch point.metricType {
-        case .bodyFatPercentage,
-             .oxygenSaturation:
-            displayValue *= 100
-        default:
-            break
-        }
-
-        let roundedValue: Any = switch point.metricType {
-        case .steps,
-             .flightsClimbed:
-            Int(displayValue)
-        default:
-            (displayValue * 100).rounded() / 100
-        }
-
-        return [
-            "id": point.id.uuidString,
-            "type": point.metricType.fileStem,
-            "value": roundedValue,
-            "unit": point.metricType == .sleepAnalysis ? "hr" : point.unit,
-            "start_date": formatter.string(from: point.timestamp),
-            "end_date": formatter.string(from: point.endTimestamp)
-        ]
-    }
-
-    private static let sleepAggregateDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
 }

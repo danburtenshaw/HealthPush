@@ -31,7 +31,7 @@ struct MetricRow: View {
                 Text(metric.displayName)
                     .font(.subheadline.weight(.medium))
 
-                Text(metric.unitString)
+                Text(metric.displayUnit)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

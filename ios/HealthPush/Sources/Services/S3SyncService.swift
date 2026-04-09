@@ -49,7 +49,7 @@ struct S3SyncService {
 
         let grouped = exporter.groupByDateAndMetric(data)
         let totalFiles = grouped.count
-        let ext = exportFormat == .csv ? "csv" : "json"
+        let ext = exportFormat == .csv ? "csv" : "jsonl"
 
         var completed = 0
         var totalNewOrUpdated = 0
@@ -63,7 +63,28 @@ struct S3SyncService {
                 ext: ext
             )
 
-            totalNewOrUpdated += try await syncFile(key: objectKey, newPoints: points)
+            let newCount = try await syncFile(key: objectKey, newPoints: points)
+            totalNewOrUpdated += newCount
+
+            // Upload _manifest.json sidecar
+            let manifestKey = HealthDataExporter.buildManifestKey(
+                prefix: pathPrefix,
+                dateString: key.dateString,
+                metricType: key.metricType
+            )
+            let mergedCount = try await countMergedRecords(key: objectKey, newPoints: points)
+            let manifestData = HealthDataExporter.buildManifest(
+                metric: key.metricType.fileStem,
+                dateString: key.dateString,
+                recordCount: mergedCount,
+                lastModified: Date()
+            )
+            try await s3Client.putObject(
+                key: manifestKey,
+                data: manifestData,
+                contentType: "application/json"
+            )
+
             completed += 1
             onProgress?(completed, totalFiles)
         }
@@ -88,12 +109,29 @@ struct S3SyncService {
             format: exportFormat
         )
 
+        let contentType = exportFormat == .csv ? "text/csv" : "application/x-ndjson"
         try await s3Client.putObject(
             key: key,
             data: result.data,
-            contentType: exportFormat.contentType
+            contentType: contentType
         )
 
         return result.newCount
+    }
+
+    private func countMergedRecords(key: String, newPoints: [HealthDataPoint]) async throws -> Int {
+        let existingData = try await s3Client.getObject(key: key)
+        let existing: [HealthDataPoint] = if let data = existingData {
+            switch exportFormat {
+            case .json:
+                exporter.decodeNDJSON(data)
+            case .csv:
+                exporter.decodeCSV(data)
+            }
+        } else {
+            []
+        }
+        let merged = exporter.merge(existing: existing, incoming: newPoints)
+        return merged.points.count
     }
 }

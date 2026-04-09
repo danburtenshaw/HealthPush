@@ -108,7 +108,7 @@ struct S3DestinationIntegrationTests {
 
         let exporter = HealthDataExporter()
         let dateKey = try #require(exporter.groupByDateAndMetric([makePoint(metricType: metricType, value: 1)]).keys.first)
-        let ext = format == .csv ? "csv" : "json"
+        let ext = format == .csv ? "csv" : "jsonl"
         let key = HealthDataExporter.buildKey(
             prefix: prefix,
             dateString: dateKey.dateString,
@@ -121,7 +121,7 @@ struct S3DestinationIntegrationTests {
 
         switch format {
         case .json:
-            return try exporter.decodeJSON(storedData)
+            return exporter.decodeNDJSON(storedData)
         case .csv:
             return exporter.decodeCSV(storedData)
         }
@@ -162,9 +162,9 @@ struct S3DestinationIntegrationTests {
             id: id,
             metricType: metricType,
             value: value,
-            unit: metricType.unitString,
-            timestamp: start,
-            endTimestamp: start.addingTimeInterval(60),
+            unit: metricType.canonicalUnit,
+            startDate: start,
+            endDate: start.addingTimeInterval(60),
             sourceName: "Integration Test"
         )
     }

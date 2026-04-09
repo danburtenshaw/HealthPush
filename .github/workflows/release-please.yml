@@ -27,6 +27,3 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          # Required by the action even in manifest mode; actual release-type
-          # lives in release-please-config.json per-package.
-          release-type: simple

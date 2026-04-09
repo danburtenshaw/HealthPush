@@ -8,33 +8,23 @@ import Testing
 struct AppStateTests {
     // MARK: Setup
 
-    /// Clears UserDefaults keys used by AppState before each test.
-    private func cleanDefaults() {
-        let keys = [
-            "last_sync_time",
-            "data_points_synced_today",
-            "data_points_synced_date",
-            "next_scheduled_sync_time",
-            "scheduled_sync_frequency",
-            "total_syncs_completed",
-            "data_retention_days",
-            "healthkit_authorized",
-            "has_seen_onboarding"
-        ]
-        for key in keys {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
+    /// Creates an isolated `UserDefaults` suite and an `AppState` backed by it.
+    /// The suite is automatically removed when the test completes.
+    private func makeIsolatedState() -> (AppState, UserDefaults) {
+        let suiteName = "test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let state = AppState(defaults: defaults)
+        return (state, defaults)
     }
 
     // MARK: lastSyncTime
 
     @Test("refreshFromUserDefaults loads lastSyncTime from UserDefaults")
     func refreshLoadsLastSyncTime() throws {
-        cleanDefaults()
-        let state = AppState()
+        let (state, defaults) = makeIsolatedState()
 
         let now = Date.now
-        UserDefaults.standard.set(now.timeIntervalSince1970, forKey: "last_sync_time")
+        defaults.set(now.timeIntervalSince1970, forKey: "last_sync_time")
         state.refreshFromUserDefaults()
 
         #expect(state.lastSyncTime != nil)
@@ -43,8 +33,7 @@ struct AppStateTests {
 
     @Test("refreshFromUserDefaults sets nil when no sync has occurred")
     func refreshNilWhenNoSync() {
-        cleanDefaults()
-        let state = AppState()
+        let (state, _) = makeIsolatedState()
 
         state.refreshFromUserDefaults()
 
@@ -55,24 +44,23 @@ struct AppStateTests {
 
     @Test("dataPointsSyncedToday resets when date changes")
     func counterResetsAtMidnight() {
-        cleanDefaults()
+        let (_, defaults) = makeIsolatedState()
         // Set counter with yesterday's date
-        UserDefaults.standard.set(100, forKey: "data_points_synced_today")
-        UserDefaults.standard.set("1999-01-01", forKey: "data_points_synced_date")
+        defaults.set(100, forKey: "data_points_synced_today")
+        defaults.set("1999-01-01", forKey: "data_points_synced_date")
 
-        let state = AppState()
+        let state = AppState(defaults: defaults)
         #expect(state.dataPointsSyncedToday == 0)
     }
 
     @Test("dataPointsSyncedToday persists for same day")
     func counterPersistsSameDay() {
-        cleanDefaults()
-        let state = AppState()
+        let (state, defaults) = makeIsolatedState()
 
         state.dataPointsSyncedToday = 42
 
-        // Reading back should return 42 (same day)
-        let state2 = AppState()
+        // Reading back from the same defaults should return 42
+        let state2 = AppState(defaults: defaults)
         #expect(state2.dataPointsSyncedToday == 42)
     }
 
@@ -80,8 +68,7 @@ struct AppStateTests {
 
     @Test("recordSyncResult updates lastSyncTime on success")
     func recordSyncResultUpdatesTime() {
-        cleanDefaults()
-        let state = AppState()
+        let (state, _) = makeIsolatedState()
 
         let result = SyncResult(
             dataPointCount: 10,
@@ -99,8 +86,7 @@ struct AppStateTests {
 
     @Test("recordSyncResult does not update lastSyncTime on failure")
     func recordSyncResultFailureNoUpdate() {
-        cleanDefaults()
-        let state = AppState()
+        let (state, _) = makeIsolatedState()
 
         let result = SyncResult(
             dataPointCount: 0,
@@ -117,8 +103,7 @@ struct AppStateTests {
 
     @Test("recordSyncResult updates lastSyncTime when at least one destination succeeds")
     func recordSyncResultPartialSuccessUpdatesTime() {
-        cleanDefaults()
-        let state = AppState()
+        let (state, _) = makeIsolatedState()
 
         let result = SyncResult(
             dataPointCount: 12,
@@ -138,14 +123,13 @@ struct AppStateTests {
 
     @Test("Onboarding flag persists")
     func onboardingFlagPersists() {
-        cleanDefaults()
-        let state = AppState()
+        let (state, defaults) = makeIsolatedState()
 
         #expect(!state.hasSeenOnboarding)
 
         state.hasSeenOnboarding = true
 
-        let state2 = AppState()
+        let state2 = AppState(defaults: defaults)
         #expect(state2.hasSeenOnboarding)
     }
 
@@ -153,19 +137,72 @@ struct AppStateTests {
 
     @Test("isSyncOverdue returns false when no next sync is scheduled")
     func notOverdueWhenNoSchedule() {
-        cleanDefaults()
-        let state = AppState()
+        let (state, _) = makeIsolatedState()
         #expect(!state.isSyncOverdue)
     }
 
     @Test("isSyncOverdue returns true when next sync is far in the past")
     func overdueWhenPast() {
-        cleanDefaults()
+        let (_, defaults) = makeIsolatedState()
         // Set next scheduled sync to 2 hours ago
         let twoHoursAgo = Date.now.addingTimeInterval(-7200)
-        UserDefaults.standard.set(twoHoursAgo.timeIntervalSince1970, forKey: "next_scheduled_sync_time")
+        defaults.set(twoHoursAgo.timeIntervalSince1970, forKey: "next_scheduled_sync_time")
 
-        let state = AppState()
+        let state = AppState(defaults: defaults)
         #expect(state.isSyncOverdue)
+    }
+
+    // MARK: Test Isolation
+
+    @Test("Tests using different defaults instances do not interfere")
+    func testIsolation() {
+        let (state1, _) = makeIsolatedState()
+        let (state2, _) = makeIsolatedState()
+
+        state1.totalSyncsCompleted = 99
+        state1.hasSeenOnboarding = true
+
+        #expect(state2.totalSyncsCompleted == 0)
+        #expect(!state2.hasSeenOnboarding)
+    }
+
+    // MARK: syncFrequency
+
+    @Test("syncFrequency defaults to one hour")
+    func syncFrequencyDefault() {
+        let (state, _) = makeIsolatedState()
+        #expect(state.syncFrequency == .oneHour)
+    }
+
+    @Test("syncFrequency round-trips through defaults")
+    func syncFrequencyRoundTrip() {
+        let (state, defaults) = makeIsolatedState()
+        state.syncFrequency = .sixHours
+
+        let state2 = AppState(defaults: defaults)
+        #expect(state2.syncFrequency == .sixHours)
+    }
+
+    // MARK: resetToDefaults
+
+    @Test("resetToDefaults clears all state")
+    func resetClearsAll() {
+        let (state, _) = makeIsolatedState()
+
+        state.hasSeenOnboarding = true
+        state.recordSyncResult(SyncResult(
+            dataPointCount: 5,
+            successfulDestinations: 1,
+            failedDestinations: 0,
+            duration: 1.0,
+            errors: []
+        ))
+
+        state.resetToDefaults()
+
+        #expect(!state.hasSeenOnboarding)
+        #expect(state.lastSyncTime == nil)
+        #expect(state.totalSyncsCompleted == 0)
+        #expect(!state.isSyncing)
     }
 }

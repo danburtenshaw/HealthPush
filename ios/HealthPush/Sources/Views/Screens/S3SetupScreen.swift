@@ -32,6 +32,7 @@ struct S3SetupScreen: View {
     @State private var syncFrequency: SyncFrequency = .oneHour
     @State private var syncStartDateOption: SyncStartDateOption = .last7Days
     @State private var syncStartDateCustom = Date.now.daysAgo(7)
+    @State private var includeSourceMetadata = false
     @State private var isEnabled = true
 
     @State private var isTesting = false
@@ -289,12 +290,18 @@ struct S3SetupScreen: View {
             .accessibilityLabel("Health Metrics")
             .accessibilityValue("\(enabledMetrics.count) of \(HealthMetricType.allCases.count) selected")
             .accessibilityHint("Opens the metric picker")
+
+            Toggle(isOn: $includeSourceMetadata) {
+                Label("Include Source Info", systemImage: "info.circle")
+            }
         } header: {
             Text("Data")
         } footer: {
             if enabledMetrics.isEmpty {
                 Text("Select at least one health metric to sync.")
                     .foregroundStyle(.red)
+            } else if includeSourceMetadata {
+                Text("Exports include which app or device recorded each measurement.")
             } else {
                 Text("Choose which health metrics to sync to this destination.")
             }
@@ -400,6 +407,7 @@ struct S3SetupScreen: View {
         hasStoredSecretAccessKey = config.credentialKeys[CredentialField.secretAccessKey] != nil
         enabledMetrics = config.enabledMetrics
         syncFrequency = config.syncFrequency
+        includeSourceMetadata = config.includeSourceMetadata
         isEnabled = config.isEnabled
     }
 
@@ -430,7 +438,7 @@ struct S3SetupScreen: View {
                     CredentialField.accessKeyID: trimmedAccessKey,
                     CredentialField.secretAccessKey: trimmedSecretKey
                 ]
-                _ = try destinationManager.createDestination(
+                let newConfig = try destinationManager.createDestination(
                     name: trimmedName,
                     type: .s3,
                     typeConfig: typeConfig,
@@ -439,6 +447,7 @@ struct S3SetupScreen: View {
                     syncFrequency: syncFrequency,
                     modelContext: modelContext
                 )
+                newConfig.includeSourceMetadata = includeSourceMetadata
 
             case let .edit(config):
                 let currentS3Config = try? config.s3Config
@@ -463,6 +472,7 @@ struct S3SetupScreen: View {
                 }
                 config.enabledMetrics = enabledMetrics
                 config.syncFrequency = syncFrequency
+                config.includeSourceMetadata = includeSourceMetadata
                 config.isEnabled = isEnabled
 
                 if startDateChanged {

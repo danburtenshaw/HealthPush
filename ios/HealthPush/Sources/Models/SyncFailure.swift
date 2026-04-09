@@ -105,11 +105,6 @@ extension SyncFailure.RecoveryAction {
         buttonTitle: "Fix URL",
         guidance: "The destination URL appears to be incorrect."
     )
-    static let fixBucketConfig = SyncFailure.RecoveryAction(
-        id: "fixBucketConfig",
-        buttonTitle: "Fix Bucket Config",
-        guidance: "Review the S3 bucket and region settings."
-    )
     static let enableMetrics = SyncFailure.RecoveryAction(
         id: "enableMetrics",
         buttonTitle: "Enable Metrics",

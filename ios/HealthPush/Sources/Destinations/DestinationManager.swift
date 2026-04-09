@@ -240,6 +240,17 @@ final class DestinationManager {
 
     /// Creates a ``SyncDestination`` instance from a persisted configuration.
     func makeDestination(for config: DestinationConfig) throws -> any SyncDestination {
+        try Self.makeDestination(for: config, networkService: networkService)
+    }
+
+    /// Creates a ``SyncDestination`` from a config and network service.
+    ///
+    /// This is the **single** destination-type switch in the codebase. All other
+    /// code flows through the ``SyncDestination`` protocol.
+    static func makeDestination(
+        for config: DestinationConfig,
+        networkService: NetworkService
+    ) throws -> any SyncDestination {
         switch config.destinationType {
         case .homeAssistant:
             try HomeAssistantDestination(config: config, networkService: networkService)

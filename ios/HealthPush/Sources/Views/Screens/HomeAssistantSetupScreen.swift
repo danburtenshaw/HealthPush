@@ -40,6 +40,7 @@ struct HomeAssistantSetupScreen: View {
     @State private var removeStoredSecret = false
     @State private var enabledMetrics: Set<HealthMetricType> = Set(HealthMetricType.allCases)
     @State private var syncFrequency: SyncFrequency = .oneHour
+    @State private var includeSourceMetadata = false
     @State private var isEnabled = true
 
     @State private var isTesting = false
@@ -211,12 +212,18 @@ struct HomeAssistantSetupScreen: View {
             .accessibilityLabel("Health Metrics")
             .accessibilityValue("\(enabledMetrics.count) of \(HealthMetricType.allCases.count) selected")
             .accessibilityHint("Opens the metric picker")
+
+            Toggle(isOn: $includeSourceMetadata) {
+                Label("Include Source Info", systemImage: "info.circle")
+            }
         } header: {
             Text("Data")
         } footer: {
             if enabledMetrics.isEmpty {
                 Text("Select at least one health metric to sync.")
                     .foregroundStyle(.red)
+            } else if includeSourceMetadata {
+                Text("Exports include which app or device recorded each measurement.")
             } else {
                 Text("Choose which health metrics to sync to this destination.")
             }
@@ -310,6 +317,7 @@ struct HomeAssistantSetupScreen: View {
         removeStoredSecret = false
         enabledMetrics = config.enabledMetrics
         syncFrequency = config.syncFrequency
+        includeSourceMetadata = config.includeSourceMetadata
         isEnabled = config.isEnabled
     }
 
@@ -336,7 +344,7 @@ struct HomeAssistantSetupScreen: View {
                 if !trimmedToken.isEmpty {
                     credentials[CredentialField.webhookSecret] = trimmedToken
                 }
-                _ = try destinationManager.createDestination(
+                let newConfig = try destinationManager.createDestination(
                     name: trimmedName,
                     type: .homeAssistant,
                     typeConfig: typeConfig,
@@ -345,6 +353,7 @@ struct HomeAssistantSetupScreen: View {
                     syncFrequency: syncFrequency,
                     modelContext: modelContext
                 )
+                newConfig.includeSourceMetadata = includeSourceMetadata
 
             case let .edit(config):
                 config.name = trimmedName
@@ -358,6 +367,7 @@ struct HomeAssistantSetupScreen: View {
                 }
                 config.enabledMetrics = enabledMetrics
                 config.syncFrequency = syncFrequency
+                config.includeSourceMetadata = includeSourceMetadata
                 config.isEnabled = isEnabled
                 try destinationManager.updateDestination(config, modelContext: modelContext)
             }

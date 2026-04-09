@@ -167,22 +167,55 @@ enum HealthMetricType: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// The default unit string for this metric.
-    var unitString: String {
+    /// The canonical unit string for this metric used in exported data.
+    ///
+    /// These are the v1 schema contract units. Use ``displayUnit`` for human-facing UI.
+    var canonicalUnit: String {
         switch self {
         case .steps: "count"
         case .activeEnergyBurned,
              .basalEnergyBurned,
              .dietaryEnergyConsumed: "kcal"
         case .distanceWalkingRunning,
-             .distanceCycling: "km"
+             .distanceCycling: "m"
         case .flightsClimbed: "count"
+        case .appleExerciseTime,
+             .appleStandTime,
+             .appleMoveTime: "s"
+        case .bodyMass,
+             .leanBodyMass: "kg"
+        case .bodyMassIndex: "count"
+        case .bodyFatPercentage: "fraction"
+        case .height: "m"
+        case .heartRate,
+             .restingHeartRate: "count/min"
+        case .heartRateVariabilitySDNN: "ms"
+        case .bloodPressureSystolic,
+             .bloodPressureDiastolic: "mmHg"
+        case .oxygenSaturation: "fraction"
+        case .respiratoryRate: "count/min"
+        case .bodyTemperature: "degC"
+        case .sleepAnalysis: "s"
+        case .dietaryWater: "mL"
+        }
+    }
+
+    /// Human-friendly unit string for display in the UI.
+    var displayUnit: String {
+        switch self {
+        case .steps: "steps"
+        case .activeEnergyBurned,
+             .basalEnergyBurned,
+             .dietaryEnergyConsumed: "kcal"
+        case .distanceWalkingRunning,
+             .distanceCycling: "km"
+        case .flightsClimbed: "flights"
         case .appleExerciseTime,
              .appleStandTime,
              .appleMoveTime: "min"
         case .bodyMass,
              .leanBodyMass: "kg"
-        case .bodyMassIndex: "count"
+        case .bodyMassIndex: "BMI"
         case .bodyFatPercentage: "%"
         case .height: "cm"
         case .heartRate,
@@ -195,6 +228,48 @@ enum HealthMetricType: String, CaseIterable, Codable, Identifiable {
         case .bodyTemperature: "degC"
         case .sleepAnalysis: "hr"
         case .dietaryWater: "mL"
+        }
+    }
+
+    /// The v1 schema metric kind: "quantity", "cumulative", or "category".
+    var metricKind: String {
+        if isCategoryType {
+            return "category"
+        } else if isCumulative {
+            return "cumulative"
+        } else {
+            return "quantity"
+        }
+    }
+
+    /// The HealthKit type identifier string for this metric (e.g. "HKQuantityTypeIdentifierHeartRate").
+    var hkIdentifierString: String {
+        switch self {
+        case .steps: "HKQuantityTypeIdentifierStepCount"
+        case .activeEnergyBurned: "HKQuantityTypeIdentifierActiveEnergyBurned"
+        case .basalEnergyBurned: "HKQuantityTypeIdentifierBasalEnergyBurned"
+        case .distanceWalkingRunning: "HKQuantityTypeIdentifierDistanceWalkingRunning"
+        case .distanceCycling: "HKQuantityTypeIdentifierDistanceCycling"
+        case .flightsClimbed: "HKQuantityTypeIdentifierFlightsClimbed"
+        case .appleExerciseTime: "HKQuantityTypeIdentifierAppleExerciseTime"
+        case .appleStandTime: "HKQuantityTypeIdentifierAppleStandTime"
+        case .appleMoveTime: "HKQuantityTypeIdentifierAppleMoveTime"
+        case .bodyMass: "HKQuantityTypeIdentifierBodyMass"
+        case .bodyMassIndex: "HKQuantityTypeIdentifierBodyMassIndex"
+        case .bodyFatPercentage: "HKQuantityTypeIdentifierBodyFatPercentage"
+        case .height: "HKQuantityTypeIdentifierHeight"
+        case .leanBodyMass: "HKQuantityTypeIdentifierLeanBodyMass"
+        case .heartRate: "HKQuantityTypeIdentifierHeartRate"
+        case .restingHeartRate: "HKQuantityTypeIdentifierRestingHeartRate"
+        case .heartRateVariabilitySDNN: "HKQuantityTypeIdentifierHeartRateVariabilitySDNN"
+        case .bloodPressureSystolic: "HKQuantityTypeIdentifierBloodPressureSystolic"
+        case .bloodPressureDiastolic: "HKQuantityTypeIdentifierBloodPressureDiastolic"
+        case .oxygenSaturation: "HKQuantityTypeIdentifierOxygenSaturation"
+        case .respiratoryRate: "HKQuantityTypeIdentifierRespiratoryRate"
+        case .bodyTemperature: "HKQuantityTypeIdentifierBodyTemperature"
+        case .sleepAnalysis: "HKCategoryTypeIdentifierSleepAnalysis"
+        case .dietaryEnergyConsumed: "HKQuantityTypeIdentifierDietaryEnergyConsumed"
+        case .dietaryWater: "HKQuantityTypeIdentifierDietaryWater"
         }
     }
 

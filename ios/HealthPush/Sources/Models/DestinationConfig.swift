@@ -91,7 +91,29 @@ final class DestinationConfig {
     /// Set to false after a successful full sync.
     var needsFullSync = true
 
+    /// Whether exported data should include source metadata (app name, bundle ID).
+    /// Defaults to `false` for privacy: most users do not need to reveal which apps
+    /// or devices recorded each measurement.
+    var includeSourceMetadata = false
+
     // MARK: Computed Properties
+
+    /// Whether this destination's credentials need re-entry (e.g. after device restore).
+    ///
+    /// Returns `true` when at least one credential key reference exists in
+    /// `credentialKeys` but the corresponding Keychain entry is missing. This
+    /// typically happens after restoring an iCloud backup to a new device because
+    /// Keychain items are stored with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`
+    /// and do not transfer across devices.
+    var needsReauth: Bool {
+        guard !credentialKeys.isEmpty else { return false }
+        for (_, keychainKey) in credentialKeys {
+            if (try? KeychainService.load(keychainKey)) == nil {
+                return true
+            }
+        }
+        return false
+    }
 
     var destinationType: DestinationType {
         get { DestinationType(rawValue: typeRaw) ?? .homeAssistant }

@@ -15,6 +15,21 @@ import UIKit
 @MainActor
 @Observable
 final class AppState {
+    // MARK: Storage
+
+    /// The `UserDefaults` instance backing all persisted preferences.
+    /// Defaults to `.standard` in production; tests inject an isolated suite.
+    let defaults: UserDefaults
+
+    // MARK: Initialization
+
+    /// Creates an AppState backed by the given UserDefaults instance.
+    /// - Parameter defaults: The defaults store. Pass a suite-scoped instance in tests.
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.hasSeenOnboarding = defaults.bool(forKey: "has_seen_onboarding")
+    }
+
     // MARK: Sync Status
 
     /// Whether a sync is currently in progress.
@@ -46,7 +61,7 @@ final class AppState {
 
     /// The next scheduled sync time, based on the actual BGTaskScheduler earliest begin date.
     var nextSyncTime: Date? {
-        let interval = UserDefaults.standard.double(forKey: "next_scheduled_sync_time")
+        let interval = defaults.double(forKey: "next_scheduled_sync_time")
         return interval > 0 ? Date(timeIntervalSince1970: interval) : nil
     }
 
@@ -68,39 +83,39 @@ final class AppState {
     /// The configured sync frequency.
     var syncFrequency: SyncFrequency {
         get {
-            let raw = UserDefaults.standard.string(forKey: "scheduled_sync_frequency")
+            let raw = defaults.string(forKey: "scheduled_sync_frequency")
                 ?? SyncFrequency.oneHour.rawValue
             return SyncFrequency(rawValue: raw) ?? .oneHour
         }
         set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: "scheduled_sync_frequency")
+            defaults.set(newValue.rawValue, forKey: "scheduled_sync_frequency")
         }
     }
 
     /// How many days of sync history to retain.
     var dataRetentionDays: Int {
         get {
-            let value = UserDefaults.standard.integer(forKey: "data_retention_days")
+            let value = defaults.integer(forKey: "data_retention_days")
             return value > 0 ? value : 30
         }
         set {
-            UserDefaults.standard.set(newValue, forKey: "data_retention_days")
+            defaults.set(newValue, forKey: "data_retention_days")
         }
     }
 
     /// Number of data points synced today. Persisted to UserDefaults with date tracking.
     var dataPointsSyncedToday: Int {
         get {
-            let storedDate = UserDefaults.standard.string(forKey: "data_points_synced_date") ?? ""
+            let storedDate = defaults.string(forKey: "data_points_synced_date") ?? ""
             let today = Self.todayString
             if storedDate != today {
                 return 0
             }
-            return UserDefaults.standard.integer(forKey: "data_points_synced_today")
+            return defaults.integer(forKey: "data_points_synced_today")
         }
         set {
-            UserDefaults.standard.set(Self.todayString, forKey: "data_points_synced_date")
-            UserDefaults.standard.set(newValue, forKey: "data_points_synced_today")
+            defaults.set(Self.todayString, forKey: "data_points_synced_date")
+            defaults.set(newValue, forKey: "data_points_synced_today")
         }
     }
 
@@ -112,30 +127,31 @@ final class AppState {
 
     /// Total number of syncs completed.
     var totalSyncsCompleted: Int {
-        get { UserDefaults.standard.integer(forKey: "total_syncs_completed") }
-        set { UserDefaults.standard.set(newValue, forKey: "total_syncs_completed") }
+        get { defaults.integer(forKey: "total_syncs_completed") }
+        set { defaults.set(newValue, forKey: "total_syncs_completed") }
     }
 
     /// Whether any sync has ever delivered data points. Once true, stays true.
     /// Used to distinguish initial-setup "no data" (likely a permissions issue)
     /// from routine periodic syncs that legitimately find nothing new.
     var hasEverSyncedData: Bool {
-        get { UserDefaults.standard.bool(forKey: "has_ever_synced_data") }
-        set { UserDefaults.standard.set(newValue, forKey: "has_ever_synced_data") }
+        get { defaults.bool(forKey: "has_ever_synced_data") }
+        set { defaults.set(newValue, forKey: "has_ever_synced_data") }
     }
 
     // MARK: HealthKit
 
     /// Whether a HealthKit authorization request completed without an API error.
     var healthKitAuthorized: Bool {
-        get { UserDefaults.standard.bool(forKey: "healthkit_authorized") }
-        set { UserDefaults.standard.set(newValue, forKey: "healthkit_authorized") }
+        get { defaults.bool(forKey: "healthkit_authorized") }
+        set { defaults.set(newValue, forKey: "healthkit_authorized") }
     }
 
     /// Whether the welcome flow has already been shown.
     /// Backed by a stored property so `@Observable` tracks mutations and SwiftUI reacts.
-    var hasSeenOnboarding: Bool = UserDefaults.standard.bool(forKey: "has_seen_onboarding") {
-        didSet { UserDefaults.standard.set(hasSeenOnboarding, forKey: "has_seen_onboarding") }
+    /// Initialized from the injected `defaults` in `init(defaults:)`.
+    var hasSeenOnboarding: Bool = false {
+        didSet { defaults.set(hasSeenOnboarding, forKey: "has_seen_onboarding") }
     }
 
     /// Whether the most recent sync completed with one or more issues.
@@ -174,7 +190,7 @@ final class AppState {
         lastSyncResult = result
         if result.successfulDestinations > 0 {
             let now = Date.now
-            UserDefaults.standard.set(now.timeIntervalSince1970, forKey: "last_sync_time")
+            defaults.set(now.timeIntervalSince1970, forKey: "last_sync_time")
             lastSyncTime = now
             totalSyncsCompleted += 1
             dataPointsSyncedToday += result.dataPointCount
@@ -203,9 +219,9 @@ final class AppState {
     /// Refreshes stored properties from UserDefaults. Call when the app returns
     /// to the foreground to pick up changes made by background syncs.
     func refreshFromUserDefaults() {
-        let interval = UserDefaults.standard.double(forKey: "last_sync_time")
+        let interval = defaults.double(forKey: "last_sync_time")
         lastSyncTime = interval > 0 ? Date(timeIntervalSince1970: interval) : nil
-        hasSeenOnboarding = UserDefaults.standard.bool(forKey: "has_seen_onboarding")
+        hasSeenOnboarding = defaults.bool(forKey: "has_seen_onboarding")
     }
 
     /// Clears the current error state.
@@ -231,7 +247,7 @@ final class AppState {
             "healthkit_anchors"
         ]
         for key in keys {
-            UserDefaults.standard.removeObject(forKey: key)
+            defaults.removeObject(forKey: key)
         }
 
         // Reset in-memory state

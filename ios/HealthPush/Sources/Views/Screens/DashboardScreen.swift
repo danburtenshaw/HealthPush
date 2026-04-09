@@ -315,7 +315,10 @@ struct DashboardScreen: View {
                 .foregroundStyle(.orange)
 
             Text(
-                "Your first sync completed but found no health data. This usually means HealthPush does not have permission to read the selected metrics. You can review permissions in the Health app under Sharing > Apps > HealthPush."
+                "Your first sync completed but found no health data."
+                    + " This usually means HealthPush does not have permission"
+                    + " to read the selected metrics. You can review permissions"
+                    + " in the Health app under Sharing > Apps > HealthPush."
             )
             .font(.subheadline)
             .foregroundStyle(.secondary)

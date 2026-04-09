@@ -150,12 +150,14 @@ def _build_handler(entry: ConfigEntry[Any]) -> Any:
                 text="No valid metrics in payload",
             )
 
+        device_name = str(data.get("device_name", "HealthPush"))[:64]
+
         entry_data = hass.data[DOMAIN].get(entry.entry_id, {})
 
         _LOGGER.debug(
             "HealthPush received %d metric(s) from %s",
             len(valid_metrics),
-            _sanitize_for_log(data.get("device_name")),
+            _sanitize_for_log(device_name),
         )
 
         async_dispatcher_send(
@@ -165,7 +167,7 @@ def _build_handler(entry: ConfigEntry[Any]) -> Any:
         )
 
         entry_data["last_timestamp"] = data.get("timestamp")
-        entry_data["last_device_name"] = data.get("device_name")
+        entry_data["last_device_name"] = device_name
 
         return web.Response(
             status=HTTPStatus.OK,
