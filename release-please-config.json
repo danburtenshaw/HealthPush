@@ -54,9 +54,5 @@
       "changelog-path": "CHANGELOG.md"
     }
   },
-  "plugins": [
-    {
-      "type": "sentence-case"
-    }
-  ]
+  "plugins": []
 }
