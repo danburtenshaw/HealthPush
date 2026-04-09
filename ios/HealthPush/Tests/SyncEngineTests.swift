@@ -221,4 +221,318 @@ struct SyncEngineTests {
         await engine.resetAnchors()
         #expect(fakeReader.resetAnchorsCallCount == 1)
     }
+
+    // MARK: - State persistence tests (the bugs that were found in production)
+
+    @Test("Successful sync sets lastSyncedAt and clears needsFullSync")
+    func successfulSyncUpdatesConfigState() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context)
+        defer { try? config.deleteAllCredentials() }
+
+        // Verify initial state
+        #expect(config.lastSyncedAt == nil)
+        #expect(config.needsFullSync == true)
+
+        let fakeReader = FakeHealthKitReader()
+        fakeReader.queryDataResult = HealthDataQueryResult(
+            dataPoints: [makeHeartRatePoint()],
+            issues: []
+        )
+
+        SyncEngineStubProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: URL(string: "http://ha.local:8123")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data("{}".utf8))
+        }
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService()
+        )
+
+        _ = await engine.performSync(modelContext: context)
+
+        // After successful sync, config state must be updated
+        #expect(config.lastSyncedAt != nil)
+        #expect(config.needsFullSync == false)
+    }
+
+    @Test("Partial success (query issues) still sets lastSyncedAt")
+    func partialSuccessUpdatesConfigState() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context, enabledMetrics: [.heartRate, .steps])
+        defer { try? config.deleteAllCredentials() }
+
+        // Return data but with query issues for one metric
+        let fakeReader = FakeHealthKitReader()
+        fakeReader.queryDataResult = HealthDataQueryResult(
+            dataPoints: [makeHeartRatePoint()],
+            issues: [HealthMetricQueryIssue(
+                metric: .steps,
+                errorDescription: "Authorization not determined"
+            )]
+        )
+
+        SyncEngineStubProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: URL(string: "http://ha.local:8123")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data("{}".utf8))
+        }
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService()
+        )
+
+        let result = await engine.performSync(modelContext: context)
+
+        // Partial success: data was delivered, so lastSyncedAt must be set
+        #expect(config.lastSyncedAt != nil)
+        #expect(config.needsFullSync == false)
+        // Still counts as a successful delivery
+        #expect(result.successfulDestinations == 1)
+        #expect(result.failedDestinations == 0)
+    }
+
+    @Test("Network failure does NOT set lastSyncedAt")
+    func networkFailureDoesNotUpdateConfigState() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context)
+        defer { try? config.deleteAllCredentials() }
+
+        let fakeReader = FakeHealthKitReader()
+        fakeReader.queryDataResult = HealthDataQueryResult(
+            dataPoints: [makeHeartRatePoint()],
+            issues: []
+        )
+
+        // Return 500 to simulate server error
+        SyncEngineStubProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: URL(string: "http://ha.local:8123")!,
+                statusCode: 500,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data("Server Error".utf8))
+        }
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService()
+        )
+
+        let result = await engine.performSync(modelContext: context)
+
+        // Failed sync must NOT update lastSyncedAt
+        #expect(config.lastSyncedAt == nil)
+        #expect(config.needsFullSync == true)
+        #expect(result.failedDestinations == 1)
+        #expect(result.successfulDestinations == 0)
+    }
+
+    @Test("SyncRecord is created with correct status on success")
+    func syncRecordCreatedOnSuccess() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context)
+        defer { try? config.deleteAllCredentials() }
+
+        let fakeReader = FakeHealthKitReader()
+        fakeReader.queryDataResult = HealthDataQueryResult(
+            dataPoints: [makeHeartRatePoint()],
+            issues: []
+        )
+
+        SyncEngineStubProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: URL(string: "http://ha.local:8123")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data("{}".utf8))
+        }
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService()
+        )
+
+        _ = await engine.performSync(modelContext: context)
+
+        let records = try context.fetch(FetchDescriptor<SyncRecord>())
+        #expect(records.count == 1)
+        #expect(records.first?.status == .success)
+        #expect(records.first?.destinationName == "Test HA")
+        #expect(records.first?.dataPointCount == 1)
+    }
+
+    @Test("SyncRecord is created with failure status on network error")
+    func syncRecordCreatedOnFailure() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context)
+        defer { try? config.deleteAllCredentials() }
+
+        let fakeReader = FakeHealthKitReader()
+        fakeReader.queryDataResult = HealthDataQueryResult(
+            dataPoints: [makeHeartRatePoint()],
+            issues: []
+        )
+
+        SyncEngineStubProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: URL(string: "http://ha.local:8123")!,
+                statusCode: 500,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data("fail".utf8))
+        }
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService()
+        )
+
+        _ = await engine.performSync(modelContext: context)
+
+        let records = try context.fetch(FetchDescriptor<SyncRecord>())
+        #expect(records.count == 1)
+        #expect(records.first?.status == .failure)
+        #expect(records.first?.failureCategoryRaw != nil)
+    }
+
+    @Test("processedDataPointCount tracks total HealthKit points, not just new ones")
+    func processedCountDistinctFromNewCount() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context)
+        defer { try? config.deleteAllCredentials() }
+
+        let fakeReader = FakeHealthKitReader()
+        fakeReader.queryDataResult = HealthDataQueryResult(
+            dataPoints: [
+                makeHeartRatePoint(value: 72),
+                makeHeartRatePoint(value: 75),
+                makeHeartRatePoint(value: 80)
+            ],
+            issues: []
+        )
+
+        SyncEngineStubProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: URL(string: "http://ha.local:8123")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data("{}".utf8))
+        }
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService()
+        )
+
+        let result = await engine.performSync(modelContext: context)
+
+        // HealthKit returned 3 points total
+        #expect(result.processedDataPointCount >= 3)
+        // HA sends latest-per-metric so newCount may differ, but processed should reflect all queried
+        #expect(result.processedDataPointCount >= result.dataPointCount)
+    }
+
+    @Test("Background mode skips recently synced destinations")
+    func backgroundSkipsRecentlySynced() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context)
+        defer { try? config.deleteAllCredentials() }
+
+        // Simulate a recent sync
+        config.lastSyncedAt = .now
+        config.needsFullSync = false
+        try context.save()
+
+        let fakeReader = FakeHealthKitReader()
+        fakeReader.queryDataResult = HealthDataQueryResult(
+            dataPoints: [makeHeartRatePoint()],
+            issues: []
+        )
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService()
+        )
+
+        // Background sync should skip this destination because it was synced recently
+        let result = await engine.performSync(modelContext: context, isBackground: true)
+
+        #expect(result.dataPointCount == 0)
+        #expect(result.successfulDestinations == 0)
+        // HealthKit should not be queried since the destination was skipped
+        #expect(fakeReader.queryDataCallCount == 0)
+    }
+
+    @Test("Manual sync does NOT skip recently synced destinations")
+    func manualSyncDoesNotSkip() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context)
+        defer { try? config.deleteAllCredentials() }
+
+        // Simulate a recent sync
+        config.lastSyncedAt = .now
+        config.needsFullSync = false
+        try context.save()
+
+        let fakeReader = FakeHealthKitReader()
+        fakeReader.queryDataResult = HealthDataQueryResult(
+            dataPoints: [makeHeartRatePoint()],
+            issues: []
+        )
+
+        SyncEngineStubProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: URL(string: "http://ha.local:8123")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data("{}".utf8))
+        }
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService()
+        )
+
+        // Manual sync (isBackground: false) should always run
+        let result = await engine.performSync(modelContext: context, isBackground: false)
+
+        #expect(fakeReader.queryDataCallCount >= 1)
+        #expect(result.successfulDestinations == 1)
+    }
 }

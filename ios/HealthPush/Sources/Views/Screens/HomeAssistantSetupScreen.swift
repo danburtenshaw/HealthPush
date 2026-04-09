@@ -415,6 +415,7 @@ struct HomeAssistantSetupScreen: View {
             return
         }
 
+        let isCreating = !isEditing
         Task {
             do {
                 try await syncEngine.requestHealthKitAuthorization(for: enabledMetrics)
@@ -422,6 +423,9 @@ struct HomeAssistantSetupScreen: View {
             } catch {
                 appState.healthKitAuthorized = false
                 appState.setError(error.localizedDescription, showAlert: true)
+            }
+            if isCreating {
+                appState.pendingFirstSync = true
             }
             dismiss()
         }

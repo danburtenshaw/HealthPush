@@ -333,12 +333,15 @@ final class SyncEngine {
             record.dataPointCount = stats.newCount
             record.duration = Date().timeIntervalSince(startTime)
 
+            // Update last sync time and clear full-sync flag on any successful delivery.
+            // Even partial success (some metric queries failed) counts — we delivered data.
+            config.lastSyncedAt = .now
+            if config.needsFullSync {
+                config.needsFullSync = false
+            }
+
             if queryIssues.isEmpty {
                 record.status = .success
-                config.lastSyncedAt = .now
-                if config.needsFullSync {
-                    config.needsFullSync = false
-                }
                 result.successCount = 1
                 logger.info("Synced \(dataPoints.count) points to \(config.name)")
             } else {
@@ -353,12 +356,12 @@ final class SyncEngine {
                 )
                 record.status = .partialFailure
                 record.applyFailure(failure)
-                result.failCount = 1
+                result.successCount = 1 // partial success still counts as a successful delivery
                 result.errors.append(SyncDestinationError(
                     destinationName: config.name,
                     errorDescription: queryMessage
                 ))
-                logger.error("Sync partially failed for \(config.name): \(queryMessage)")
+                logger.warning("Sync partially succeeded for \(config.name): \(queryMessage)")
             }
         } catch {
             let failure = destination.classifyError(error)

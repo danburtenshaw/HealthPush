@@ -145,6 +145,12 @@ struct DashboardScreen: View {
                 // Reset dismissal when the nudge kind changes
                 nudgeDismissed = false
             }
+            .onChange(of: appState.pendingFirstSync) {
+                if appState.pendingFirstSync {
+                    appState.pendingFirstSync = false
+                    Task { await performSync() }
+                }
+            }
         }
     }
 

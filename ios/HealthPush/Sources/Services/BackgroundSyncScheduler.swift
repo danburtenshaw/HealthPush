@@ -26,6 +26,10 @@ final class BackgroundSyncScheduler {
     /// Debounce task for observer-triggered syncs.
     private var pendingObserverSync: Task<Void, Never>?
 
+    /// When true, observer-triggered syncs are suppressed (e.g. during initial
+    /// observer registration, which fires all queries immediately).
+    private var suppressObserverSyncs = false
+
     /// Observable application state — the single source of truth for `isSyncing`.
     /// Set via ``configure(appState:)`` before the first sync.
     private var appState: AppState?
@@ -133,9 +137,26 @@ final class BackgroundSyncScheduler {
 
     // MARK: Observer Handling
 
+    /// Temporarily suppresses observer-triggered syncs.
+    ///
+    /// Use this around `enableBackgroundDelivery` calls to prevent the
+    /// initial observer query fire from triggering an unwanted sync.
+    func withObserversSuppressed(_ work: () async -> Void) async {
+        suppressObserverSyncs = true
+        await work()
+        // Allow a brief window for the initial observer fires to be ignored.
+        try? await Task.sleep(for: .seconds(4))
+        suppressObserverSyncs = false
+    }
+
     /// Called when an HKObserverQuery fires. Debounces rapid successive calls
     /// (e.g., Apple Watch dumping multiple metric types at once) into a single sync.
     func handleObserverUpdate() {
+        guard !suppressObserverSyncs else {
+            logger.info("Observer update suppressed during registration")
+            return
+        }
+
         pendingObserverSync?.cancel()
         pendingObserverSync = Task {
             try? await Task.sleep(for: .seconds(3))
@@ -150,9 +171,6 @@ final class BackgroundSyncScheduler {
             isSyncing = true
             let success = await syncHandler?() ?? false
             isSyncing = false
-            if success {
-                UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: "last_sync_time")
-            }
             logger.info("Observer-triggered sync completed with success: \(success)")
         }
     }

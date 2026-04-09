@@ -63,15 +63,18 @@ struct HealthPushApp: App {
 
     private func registerBackgroundTasks() {
         let container = modelContainer
+        let appState = appState
+        let destinationManager = destinationManager
+        let syncEngine = syncEngine
         BackgroundSyncScheduler.shared.registerTasks { @MainActor in
-            let context = ModelContext(container)
-            let engine = SyncEngine()
-            let result = await engine.performSync(modelContext: context, isBackground: true)
-            let success = result.failedDestinations == 0
-            if success {
-                UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: "last_sync_time")
-            }
-            return success
+            // Use the main context so SwiftData changes (lastSyncedAt, needsFullSync)
+            // are visible to the UI immediately. Using a separate ModelContext would
+            // cause the dashboard to show stale data until the contexts merge.
+            let context = container.mainContext
+            let result = await syncEngine.performSync(modelContext: context, isBackground: true)
+            appState.recordSyncResult(result)
+            destinationManager.loadDestinations(modelContext: context)
+            return result.failedDestinations == 0
         }
     }
 
@@ -112,8 +115,10 @@ struct HealthPushApp: App {
 
         if !allEnabledMetrics.isEmpty {
             Task {
-                await syncEngine.enableBackgroundDelivery(for: allEnabledMetrics) {
-                    await BackgroundSyncScheduler.shared.handleObserverUpdate()
+                await BackgroundSyncScheduler.shared.withObserversSuppressed {
+                    await syncEngine.enableBackgroundDelivery(for: allEnabledMetrics) {
+                        await BackgroundSyncScheduler.shared.handleObserverUpdate()
+                    }
                 }
             }
         }
@@ -135,8 +140,10 @@ struct HealthPushApp: App {
 
             if !allMetrics.isEmpty {
                 Task {
-                    await syncEngine.enableBackgroundDelivery(for: allMetrics) {
-                        await BackgroundSyncScheduler.shared.handleObserverUpdate()
+                    await BackgroundSyncScheduler.shared.withObserversSuppressed {
+                        await syncEngine.enableBackgroundDelivery(for: allMetrics) {
+                            await BackgroundSyncScheduler.shared.handleObserverUpdate()
+                        }
                     }
                 }
             }

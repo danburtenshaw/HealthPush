@@ -41,6 +41,10 @@ final class AppState {
     /// Status text per destination during sync.
     var syncStatusText: [String: String] = [:]
 
+    /// When true, the Dashboard should trigger an immediate sync on next appear.
+    /// Set after creating a new destination so the first sync happens automatically.
+    var pendingFirstSync = false
+
     /// The result of the most recent sync, if any.
     var lastSyncResult: SyncResult?
 
@@ -198,8 +202,12 @@ final class AppState {
             lastSyncTime = now
             totalSyncsCompleted += 1
             dataPointsSyncedToday += result.dataPointCount
-            if result.dataPointCount > 0 {
+            if result.processedDataPointCount > 0 {
                 hasEverSyncedData = true
+                // HealthKit returned data, so authorization is confirmed working.
+                if !healthKitAuthorized {
+                    healthKitAuthorized = true
+                }
             }
         }
 
