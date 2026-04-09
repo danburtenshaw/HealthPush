@@ -198,8 +198,8 @@ enum HealthMetricType: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// The Home Assistant sensor entity ID suffix.
-    var sensorEntitySuffix: String {
+    /// A snake_case identifier for this metric used in file names and entity IDs.
+    var fileStem: String {
         switch self {
         case .steps: "steps"
         case .activeEnergyBurned: "active_energy"

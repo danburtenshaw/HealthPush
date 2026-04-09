@@ -27,7 +27,7 @@ struct SyncStats {
 ///
 /// 1. Create a new file in `Sources/Destinations/`.
 /// 2. Create a struct conforming to `SyncDestination`.
-/// 3. Implement `sync(data:)` and `testConnection()`.
+/// 3. Implement all required methods including `sync(data:onProgress:)`.
 /// 4. Add a new case to `DestinationType`.
 /// 5. Add configuration UI in `Views/Screens/`.
 protocol SyncDestination: Identifiable, Sendable {
@@ -40,14 +40,60 @@ protocol SyncDestination: Identifiable, Sendable {
     /// Whether this destination is currently enabled.
     var isEnabled: Bool { get }
 
-    /// Syncs the given health data points to the destination.
-    /// - Parameter data: The health data points to sync.
+    /// The destination's sync capabilities.
+    var capabilities: SyncCapabilities { get }
+
+    /// Returns the query window for discrete metrics based on sync state.
+    ///
+    /// - Parameters:
+    ///   - lastSyncedAt: When this destination was last successfully synced, or nil if never.
+    ///   - needsFullSync: Whether a full (non-incremental) sync has been requested.
+    ///   - now: The current time (injectable for testing).
+    /// - Returns: The date range to query HealthKit for discrete metrics.
+    func queryWindow(lastSyncedAt: Date?, needsFullSync: Bool, now: Date) -> QueryWindow
+
+    /// Returns the query window for cumulative metrics, or nil to reuse the discrete window.
+    ///
+    /// Some destinations need a different window for cumulative metrics. For example,
+    /// Home Assistant always queries from start-of-day to report full daily totals.
+    ///
+    /// - Parameters:
+    ///   - lastSyncedAt: When this destination was last successfully synced, or nil if never.
+    ///   - now: The current time (injectable for testing).
+    /// - Returns: A query window for cumulative metrics, or nil to use the discrete window.
+    func cumulativeQueryWindow(lastSyncedAt: Date?, now: Date) -> QueryWindow?
+
+    /// Syncs health data with progress reporting.
+    ///
+    /// - Parameters:
+    ///   - data: The health data points to sync.
+    ///   - onProgress: Optional callback reporting (completedItems, totalItems).
     /// - Returns: Statistics about what was actually written.
     /// - Throws: An error if the sync fails.
-    func sync(data: [HealthDataPoint]) async throws -> SyncStats
+    func sync(data: [HealthDataPoint], onProgress: (@Sendable (Int, Int) -> Void)?) async throws -> SyncStats
 
     /// Tests whether the destination is reachable and properly configured.
     /// - Returns: `true` if the connection test succeeds.
     /// - Throws: An error if the connection test fails.
     func testConnection() async throws -> Bool
+
+    /// Classifies a sync error into a ``SyncFailure`` for retry decisions and UI recovery.
+    ///
+    /// Each destination maps its own error types to the generic failure taxonomy.
+    /// The default implementation returns `.transient` for all errors.
+    func classifyError(_ error: Error) -> SyncFailure
+}
+
+// MARK: - SyncDestination Defaults
+
+extension SyncDestination {
+    /// Convenience overload that syncs without progress reporting.
+    func sync(data: [HealthDataPoint]) async throws -> SyncStats {
+        try await sync(data: data, onProgress: nil)
+    }
+
+    /// Default error classification using common network error patterns.
+    func classifyError(_ error: Error) -> SyncFailure {
+        SyncFailure.classifyNetworkError(error)
+    }
 }

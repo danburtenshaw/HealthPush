@@ -41,13 +41,14 @@ struct DashboardScreen: View {
                         // No destinations — guide the user to set one up
                         emptyDestinationsPrompt
                     } else {
-                        // Status card
+                        // Status card — derives sync time and overdue status
+                        // from per-destination timestamps, not AppState.lastSyncTime.
                         SyncStatusCard(
                             isSyncing: appState.isSyncing,
-                            lastSyncTime: appState.lastSyncTimeFormatted,
+                            lastSyncTime: aggregateLastSyncFormatted,
                             dataPointsSyncedToday: appState.dataPointsSyncedToday,
                             totalSyncsCompleted: appState.totalSyncsCompleted,
-                            isSyncOverdue: appState.isSyncOverdue,
+                            isSyncOverdue: isAnyDestinationOverdue,
                             hasSyncIssues: latestIssueRecord != nil
                         )
 
@@ -151,7 +152,7 @@ struct DashboardScreen: View {
                     .font(.headline)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 52)
+            .frame(minHeight: 52)
             .background {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(appState.isSyncing ? Color.gray : Color.accentColor)
@@ -238,7 +239,7 @@ struct DashboardScreen: View {
                         .font(.headline)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 52)
+                .frame(minHeight: 52)
                 .background {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(Color.accentColor)
@@ -355,12 +356,10 @@ struct DashboardScreen: View {
     private func performSync() async {
         guard !appState.isSyncing else { return }
         appState.isSyncing = true
-        BackgroundSyncScheduler.shared.setForegroundSyncing(true)
         appState.syncProgress = [:]
         appState.syncStatusText = [:]
         defer {
             appState.isSyncing = false
-            BackgroundSyncScheduler.shared.setForegroundSyncing(false)
             appState.syncProgress = [:]
             appState.syncStatusText = [:]
         }
@@ -387,8 +386,55 @@ struct DashboardScreen: View {
         destinationManager.loadDestinations(modelContext: modelContext)
     }
 
+    // MARK: Per-Destination Aggregate Status
+
+    /// The most recent `lastSyncedAt` across all enabled destinations.
+    private var aggregateLastSyncDate: Date? {
+        destinationManager.destinations
+            .filter(\.isEnabled)
+            .compactMap(\.lastSyncedAt)
+            .max()
+    }
+
+    /// Formatted string for the most recent sync time across all destinations.
+    private var aggregateLastSyncFormatted: String {
+        guard let date = aggregateLastSyncDate else { return "Never" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: .now)
+    }
+
+    /// Whether any enabled destination is overdue for a sync.
+    ///
+    /// A destination is considered overdue when its `nextSyncTime` (derived from
+    /// `lastSyncedAt + syncFrequency`) is more than 30 minutes in the past.
+    /// A destination that has never synced is also treated as overdue-like, but
+    /// that state is handled separately by the "Not synced" status in `SyncStatusCard`.
+    private var isAnyDestinationOverdue: Bool {
+        let enabledDestinations = destinationManager.destinations.filter(\.isEnabled)
+        guard !enabledDestinations.isEmpty else { return false }
+
+        for destination in enabledDestinations {
+            guard let nextSync = destination.nextSyncTime else {
+                // Never synced — not overdue per se, but "Never" status covers this.
+                continue
+            }
+            if Date.now > nextSync.addingTimeInterval(30 * 60) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Whether any enabled destination has never been synced.
+    private var hasNeverSyncedDestination: Bool {
+        destinationManager.destinations
+            .filter(\.isEnabled)
+            .contains { $0.lastSyncedAt == nil }
+    }
+
     private var showSetupChecklist: Bool {
-        !appState.healthKitAuthorized || appState.lastSyncTime == nil
+        !appState.healthKitAuthorized || hasNeverSyncedDestination
     }
 
     private var latestIssueRecord: SyncRecord? {
@@ -420,10 +466,10 @@ struct DashboardScreen: View {
 
             checklistRow(
                 title: "First successful sync",
-                detail: appState
-                    .lastSyncTime == nil ? "Run Sync Now once your destination is configured." :
-                    "Last completed \(appState.lastSyncTimeFormatted).",
-                isComplete: appState.lastSyncTime != nil
+                detail: hasNeverSyncedDestination
+                    ? "Run Sync Now once your destination is configured."
+                    : "Last completed \(aggregateLastSyncFormatted).",
+                isComplete: !hasNeverSyncedDestination
             )
 
             HStack(spacing: 12) {
@@ -457,6 +503,18 @@ struct DashboardScreen: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(4)
 
+            if let failure = record.failureCategory {
+                if failure.isRetryable {
+                    Text("Will retry automatically on next sync.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if let recovery = failure.recoveryAction {
+                    Text(recovery.guidance)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.orange)
+                }
+            }
+
             HStack(spacing: 12) {
                 Button("View History") {
                     showingSyncHistory = true
@@ -464,13 +522,21 @@ struct DashboardScreen: View {
                 .buttonStyle(.bordered)
                 .accessibilityHint("Opens sync history to review past operations")
 
-                Button("Review Destinations") {
-                    if let preferred = destinationManager.destinations.first(where: \.isEnabled) {
-                        selectedConfig = preferred
+                if let recovery = record.failureCategory?.recoveryAction {
+                    Button(recovery.buttonTitle) {
+                        navigateToRecovery(record: record)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityHint("Opens the destination settings to fix the issue")
+                } else {
+                    Button("Review Destinations") {
+                        if let preferred = destinationManager.destinations.first(where: \.isEnabled) {
+                            selectedConfig = preferred
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityHint("Opens the first enabled destination for review")
                 }
-                .buttonStyle(.borderedProminent)
-                .accessibilityHint("Opens the first enabled destination for review")
             }
         }
         .padding(18)
@@ -483,6 +549,11 @@ struct DashboardScreen: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.orange.opacity(0.25), lineWidth: 1)
         }
+    }
+
+    private func navigateToRecovery(record: SyncRecord) {
+        let matchingConfig = destinationManager.destinations.first { $0.id == record.destinationID }
+        selectedConfig = matchingConfig ?? destinationManager.destinations.first(where: \.isEnabled)
     }
 
     private func checklistRow(title: String, detail: String, isComplete: Bool) -> some View {

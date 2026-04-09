@@ -9,17 +9,20 @@ struct HomeAssistantDestinationTests {
     // MARK: Helpers
 
     private func makeConfig(
-        baseURL: String = "http://ha.local:8123/api/webhook/healthpush_abc123",
-        apiToken: String = "test_secret",
+        webhookURL: String = "http://ha.local:8123/api/webhook/healthpush_abc123",
+        webhookSecret: String = "test_secret",
         enabledMetrics: Set<HealthMetricType> = [.steps, .heartRate]
     ) -> DestinationConfig {
-        DestinationConfig(
+        let config = DestinationConfig(
             name: "Test HA",
             destinationType: .homeAssistant,
-            baseURL: baseURL,
-            apiToken: apiToken,
+            typeConfig: .homeAssistant(HomeAssistantTypeConfig(webhookURL: webhookURL)),
             enabledMetrics: enabledMetrics
         )
+        if !webhookSecret.isEmpty {
+            try? config.setCredential(webhookSecret, for: CredentialField.webhookSecret)
+        }
+        return config
     }
 
     private func makeDataPoint(
@@ -41,6 +44,7 @@ struct HomeAssistantDestinationTests {
     @Test("Creates destination from config")
     func initialization() throws {
         let config = makeConfig()
+        defer { try? config.deleteAllCredentials() }
         let destination = try HomeAssistantDestination(config: config)
 
         #expect(destination.id == config.id)
@@ -52,7 +56,8 @@ struct HomeAssistantDestinationTests {
 
     @Test("Sync throws with empty URL")
     func emptyURLThrows() async {
-        let config = makeConfig(baseURL: "")
+        let config = makeConfig(webhookURL: "")
+        defer { try? config.deleteAllCredentials() }
 
         do {
             let destination = try HomeAssistantDestination(config: config)
@@ -72,7 +77,8 @@ struct HomeAssistantDestinationTests {
     @Test("Sync succeeds with empty secret (no auth)")
     func emptySecretDoesNotThrow() async {
         // An empty webhook secret is valid — it just means no X-Webhook-Secret header
-        let config = makeConfig(apiToken: "")
+        let config = makeConfig(webhookSecret: "")
+        defer { try? config.deleteAllCredentials() }
 
         // This will fail with a connection error (no real server), not a config error
         do {
@@ -91,7 +97,8 @@ struct HomeAssistantDestinationTests {
 
     @Test("Test connection throws with empty URL")
     func connectionEmptyURL() async {
-        let config = makeConfig(baseURL: "")
+        let config = makeConfig(webhookURL: "")
+        defer { try? config.deleteAllCredentials() }
 
         do {
             let destination = try HomeAssistantDestination(config: config)
@@ -130,6 +137,7 @@ struct HomeAssistantDestinationTests {
     @Test("Conforms to SyncDestination")
     func protocolConformance() throws {
         let config = makeConfig()
+        defer { try? config.deleteAllCredentials() }
         let destination = try HomeAssistantDestination(config: config)
 
         // Verify Identifiable

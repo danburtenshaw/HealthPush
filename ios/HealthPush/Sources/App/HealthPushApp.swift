@@ -77,6 +77,18 @@ struct HealthPushApp: App {
 
     @MainActor
     private func onAppLaunch() {
+        // Give the background scheduler access to the single isSyncing source of truth
+        BackgroundSyncScheduler.shared.configure(appState: appState)
+
+        // Sweep orphaned Keychain items left behind by a previous installation.
+        // Keychain items with kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly survive
+        // app deletion, so we clean them up on the first launch of a fresh install.
+        let hasCompletedFirstLaunch = UserDefaults.standard.bool(forKey: "has_completed_first_launch")
+        if !hasCompletedFirstLaunch {
+            try? KeychainService.deleteAllServiceItems()
+            UserDefaults.standard.set(true, forKey: "has_completed_first_launch")
+        }
+
         // Hydrate stored properties from UserDefaults (background syncs may have updated them)
         appState.refreshFromUserDefaults()
 

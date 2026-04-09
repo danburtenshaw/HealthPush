@@ -14,6 +14,8 @@ struct SyncStatusCard: View {
     var isSyncOverdue = false
     var hasSyncIssues = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     @State private var pulseScale: CGFloat = 1.0
 
     // MARK: Body
@@ -89,21 +91,23 @@ struct SyncStatusCard: View {
                 .frame(width: 44, height: 44)
 
             if isSyncing {
-                Circle()
-                    .fill(statusColor.opacity(0.08))
-                    .frame(width: 44, height: 44)
-                    .scaleEffect(pulseScale)
-                    .onAppear {
-                        withAnimation(
-                            .easeInOut(duration: 1.0)
-                                .repeatForever(autoreverses: true)
-                        ) {
-                            pulseScale = 1.4
+                if !reduceMotion {
+                    Circle()
+                        .fill(statusColor.opacity(0.08))
+                        .frame(width: 44, height: 44)
+                        .scaleEffect(pulseScale)
+                        .onAppear {
+                            withAnimation(
+                                .easeInOut(duration: 1.0)
+                                    .repeatForever(autoreverses: true)
+                            ) {
+                                pulseScale = 1.4
+                            }
                         }
-                    }
-                    .onDisappear {
-                        pulseScale = 1.0
-                    }
+                        .onDisappear {
+                            pulseScale = 1.0
+                        }
+                }
 
                 ProgressView()
                     .tint(statusColor)

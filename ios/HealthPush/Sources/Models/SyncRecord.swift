@@ -43,12 +43,70 @@ final class SyncRecord {
     /// Human-readable error message, if any.
     var errorMessage: String?
 
+    /// The failure category raw value (transient, permanent, partial).
+    var failureCategoryRaw: String?
+
+    /// The recovery action stored as JSON for permanent failures.
+    var recoveryActionData: Data?
+
+    /// Number of destinations that succeeded (for partial failures).
+    var partialSuccessCount: Int?
+
+    /// Number of destinations that failed (for partial failures).
+    var partialFailureCount: Int?
+
     /// Whether this was a background sync or a manual foreground sync.
     var isBackgroundSync: Bool
 
     var status: SyncStatus {
         get { SyncStatus(rawValue: statusRaw) ?? .failure }
         set { statusRaw = newValue.rawValue }
+    }
+
+    /// The structured failure category, reconstructed from stored raw values.
+    var failureCategory: SyncFailure? {
+        guard let raw = failureCategoryRaw else { return nil }
+        let message = errorMessage ?? "Unknown error"
+        switch raw {
+        case "transient":
+            return .transient(message: message)
+        case "permanent":
+            let recovery = recoveryActionData.flatMap { try? JSONDecoder().decode(SyncFailure.RecoveryAction.self, from: $0) }
+            return .permanent(message: message, recovery: recovery)
+        case "partial":
+            return .partial(
+                successes: partialSuccessCount ?? 0,
+                failures: partialFailureCount ?? 0,
+                message: message
+            )
+        default:
+            return nil
+        }
+    }
+
+    /// The maximum number of characters stored in ``errorMessage``.
+    static let maxErrorMessageLength = 200
+
+    /// Applies a ``SyncFailure`` to this record, storing its category, recovery action,
+    /// and display message. The error message is truncated to ``maxErrorMessageLength``
+    /// characters to prevent SwiftData store bloat.
+    func applyFailure(_ failure: SyncFailure) {
+        failureCategoryRaw = failure.categoryRaw
+        errorMessage = Self.truncateErrorMessage(failure.displayMessage)
+        if case let .permanent(_, recovery) = failure {
+            recoveryActionData = recovery.flatMap { try? JSONEncoder().encode($0) }
+        }
+        if case let .partial(successes, failures, _) = failure {
+            partialSuccessCount = successes
+            partialFailureCount = failures
+        }
+    }
+
+    /// Truncates a message to ``maxErrorMessageLength`` characters, appending an
+    /// ellipsis when truncation occurs.
+    private static func truncateErrorMessage(_ message: String?) -> String? {
+        guard let message, message.count > maxErrorMessageLength else { return message }
+        return String(message.prefix(maxErrorMessageLength - 1)) + "\u{2026}"
     }
 
     /// Creates a new sync record.
@@ -78,7 +136,7 @@ final class SyncRecord {
         self.duration = duration
         self.dataPointCount = dataPointCount
         statusRaw = status.rawValue
-        self.errorMessage = errorMessage
+        self.errorMessage = Self.truncateErrorMessage(errorMessage)
         self.isBackgroundSync = isBackgroundSync
     }
 }

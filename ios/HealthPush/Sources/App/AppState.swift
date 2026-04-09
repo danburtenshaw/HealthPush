@@ -38,6 +38,10 @@ final class AppState {
     // MARK: Timestamps
 
     /// When the last successful sync completed. Stored property so `@Observable` tracks changes.
+    ///
+    /// **Note:** This is used for background scheduling decisions (e.g., `isSyncOverdue`,
+    /// `BGTaskScheduler` earliest begin dates). The Dashboard UI should derive display
+    /// timestamps from per-destination `DestinationConfig.lastSyncedAt` values instead.
     var lastSyncTime: Date?
 
     /// The next scheduled sync time, based on the actual BGTaskScheduler earliest begin date.
@@ -65,7 +69,6 @@ final class AppState {
     var syncFrequency: SyncFrequency {
         get {
             let raw = UserDefaults.standard.string(forKey: "scheduled_sync_frequency")
-                ?? UserDefaults.standard.string(forKey: "sync_frequency")
                 ?? SyncFrequency.oneHour.rawValue
             return SyncFrequency(rawValue: raw) ?? .oneHour
         }
@@ -209,6 +212,37 @@ final class AppState {
     func clearError() {
         lastError = nil
         showingError = false
+    }
+
+    /// Resets all HealthPush UserDefaults keys to factory defaults and clears in-memory state.
+    /// Called as part of the full data erasure flow.
+    func resetToDefaults() {
+        let keys = [
+            "last_sync_time",
+            "next_scheduled_sync_time",
+            "scheduled_sync_frequency",
+            "data_retention_days",
+            "data_points_synced_date",
+            "data_points_synced_today",
+            "total_syncs_completed",
+            "has_ever_synced_data",
+            "healthkit_authorized",
+            "has_seen_onboarding",
+            "healthkit_anchors"
+        ]
+        for key in keys {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+
+        // Reset in-memory state
+        isSyncing = false
+        syncProgress = [:]
+        syncStatusText = [:]
+        lastSyncResult = nil
+        lastSyncTime = nil
+        lastError = nil
+        showingError = false
+        hasSeenOnboarding = false
     }
 
     /// Returns a formatted string for the last sync time.

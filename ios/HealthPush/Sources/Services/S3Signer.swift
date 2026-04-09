@@ -53,7 +53,7 @@ struct S3Signer {
         request.setValue(payloadHash, forHTTPHeaderField: "x-amz-content-sha256")
 
         guard let url = request.url,
-              let hostname = url.host() else { return }
+              let hostname = url.host()?.lowercased() else { return }
         let host: String = if let port = url.port,
                               !(url.scheme == "https" && port == 443),
                               !(url.scheme == "http" && port == 80)
@@ -75,7 +75,21 @@ struct S3Signer {
 
         let canonicalQueryString: String = {
             guard let query = url.query(percentEncoded: true), !query.isEmpty else { return "" }
-            return query.components(separatedBy: "&").sorted().joined(separator: "&")
+            // SigV4 requires sorting by parameter name, then by value for duplicate keys.
+            return query.components(separatedBy: "&")
+                .sorted { lhs, rhs in
+                    let lhsParts = lhs.split(separator: "=", maxSplits: 1)
+                    let rhsParts = rhs.split(separator: "=", maxSplits: 1)
+                    let lhsKey = lhsParts.first ?? ""
+                    let rhsKey = rhsParts.first ?? ""
+                    if lhsKey == rhsKey {
+                        let lhsValue = lhsParts.count > 1 ? lhsParts[1] : Substring("")
+                        let rhsValue = rhsParts.count > 1 ? rhsParts[1] : Substring("")
+                        return lhsValue < rhsValue
+                    }
+                    return lhsKey < rhsKey
+                }
+                .joined(separator: "&")
         }()
 
         // Collect and sort headers by lowercase name

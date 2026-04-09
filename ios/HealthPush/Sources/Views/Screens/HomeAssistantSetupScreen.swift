@@ -104,6 +104,22 @@ struct HomeAssistantSetupScreen: View {
                 .keyboardType(.URL)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
+
+            if case let .invalid(message) = urlValidation, !message.isEmpty {
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+
+            if urlValidation.isHTTP {
+                Label(
+                    "Insecure connection \u{2014} only use on trusted networks",
+                    systemImage: "exclamationmark.shield.fill"
+                )
+                .font(.footnote)
+                .foregroundStyle(.orange)
+                .listRowBackground(Color.orange.opacity(0.1))
+            }
         } header: {
             Text("Connection")
         } footer: {
@@ -268,9 +284,16 @@ struct HomeAssistantSetupScreen: View {
         return false
     }
 
+    private var urlValidation: URLValidationResult {
+        let trimmed = baseURL.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return .invalid("") }
+        return URLValidator.validateWebhookURL(trimmed)
+    }
+
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
             && !baseURL.trimmingCharacters(in: .whitespaces).isEmpty
+            && urlValidation.isAcceptable
             && !enabledMetrics.isEmpty
     }
 
@@ -279,9 +302,11 @@ struct HomeAssistantSetupScreen: View {
     private func loadExistingConfig() {
         guard case let .edit(config) = mode else { return }
         name = config.name
-        baseURL = config.baseURL
+        if let haConfig = try? config.homeAssistantConfig {
+            baseURL = haConfig.webhookURL
+        }
         apiToken = ""
-        hasStoredSecret = (try? config.hasStoredAPIToken) ?? !config.apiToken.isEmpty
+        hasStoredSecret = config.credentialKeys[CredentialField.webhookSecret] != nil
         removeStoredSecret = false
         enabledMetrics = config.enabledMetrics
         syncFrequency = config.syncFrequency
@@ -295,13 +320,27 @@ struct HomeAssistantSetupScreen: View {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedToken = apiToken.trimmingCharacters(in: .whitespaces)
 
+        let validation = URLValidator.validateWebhookURL(trimmedURL)
+        guard validation.isAcceptable else {
+            appState.setError(validation.errorMessage ?? "Invalid URL")
+            return
+        }
+
         do {
             switch mode {
             case .create:
-                _ = try destinationManager.createHomeAssistantDestination(
+                let typeConfig = TypeSpecificConfig.homeAssistant(
+                    HomeAssistantTypeConfig(webhookURL: trimmedURL)
+                )
+                var credentials: [String: String] = [:]
+                if !trimmedToken.isEmpty {
+                    credentials[CredentialField.webhookSecret] = trimmedToken
+                }
+                _ = try destinationManager.createDestination(
                     name: trimmedName,
-                    baseURL: trimmedURL,
-                    apiToken: trimmedToken,
+                    type: .homeAssistant,
+                    typeConfig: typeConfig,
+                    credentials: credentials,
                     enabledMetrics: enabledMetrics,
                     syncFrequency: syncFrequency,
                     modelContext: modelContext
@@ -309,11 +348,13 @@ struct HomeAssistantSetupScreen: View {
 
             case let .edit(config):
                 config.name = trimmedName
-                config.baseURL = trimmedURL
+                try config.setTypeConfig(.homeAssistant(
+                    HomeAssistantTypeConfig(webhookURL: trimmedURL)
+                ))
                 if removeStoredSecret && trimmedToken.isEmpty {
-                    try config.deleteStoredAPIToken()
+                    try config.deleteCredential(for: CredentialField.webhookSecret)
                 } else if !trimmedToken.isEmpty {
-                    config.apiToken = trimmedToken
+                    try config.setCredential(trimmedToken, for: CredentialField.webhookSecret)
                 }
                 config.enabledMetrics = enabledMetrics
                 config.syncFrequency = syncFrequency
@@ -355,23 +396,17 @@ struct HomeAssistantSetupScreen: View {
         let effectiveToken: String = if !apiToken.trimmingCharacters(in: .whitespaces).isEmpty {
             apiToken.trimmingCharacters(in: .whitespaces)
         } else if case let .edit(config) = mode, !removeStoredSecret {
-            (try? config.resolvedAPIToken) ?? ""
+            (try? config.credential(for: CredentialField.webhookSecret)) ?? ""
         } else {
             ""
         }
 
-        let tempConfig = DestinationConfig(
-            name: name,
-            destinationType: .homeAssistant,
-            baseURL: baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")),
-            apiToken: effectiveToken
+        let destination = HomeAssistantDestination(
+            webhookURL: baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")),
+            webhookSecret: effectiveToken
         )
 
         do {
-            let destination = try HomeAssistantDestination(
-                config: tempConfig,
-                migrateSecretsIfNeeded: false
-            )
             let success = try await destination.testConnection()
             testResult = success ? .success : .failure("Test returned false")
         } catch {

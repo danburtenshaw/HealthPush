@@ -80,7 +80,7 @@ struct HealthDataExporterTests {
             categoryValue: 4
         )
         let json = try exporter.encodeJSON([original])
-        let decoded = exporter.decodeJSON(json)
+        let decoded = try exporter.decodeJSON(json)
 
         #expect(decoded.count == 1)
         #expect(decoded[0].id == original.id)
@@ -160,7 +160,7 @@ struct HealthDataExporterTests {
         )
 
         #expect(result.newCount == 1)
-        let decoded = exporter.decodeJSON(result.data)
+        let decoded = try exporter.decodeJSON(result.data)
         #expect(decoded.count == 1)
         #expect(decoded[0].id == point.id)
     }

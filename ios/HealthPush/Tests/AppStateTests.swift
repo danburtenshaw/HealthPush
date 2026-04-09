@@ -15,7 +15,6 @@ struct AppStateTests {
             "data_points_synced_today",
             "data_points_synced_date",
             "next_scheduled_sync_time",
-            "sync_frequency",
             "scheduled_sync_frequency",
             "total_syncs_completed",
             "data_retention_days",

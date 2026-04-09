@@ -199,7 +199,7 @@ struct OnboardingScreen: View {
                 Text(destinationManager.destinations.isEmpty ? "Continue to App" : "Go to Dashboard")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 52)
+                    .frame(minHeight: 52)
                     .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .foregroundStyle(.white)
             }
@@ -211,6 +211,8 @@ struct OnboardingScreen: View {
     private func trustPill(_ title: String, systemImage: String) -> some View {
         Label(title, systemImage: systemImage)
             .font(.caption.weight(.medium))
+            .lineLimit(nil)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(Color(.secondarySystemGroupedBackground), in: Capsule())

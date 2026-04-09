@@ -12,10 +12,13 @@ struct SettingsScreen: View {
 
     @Environment(AppState.self) private var appState
     @Environment(SyncEngine.self) private var syncEngine
+    @Environment(DestinationManager.self) private var destinationManager
     @Environment(\.modelContext) private var modelContext
 
     @State private var showingSyncHistory = false
     @State private var showingResetConfirmation = false
+    @State private var showingEraseConfirmation = false
+    @State private var eraseConfirmationText = ""
 
     // MARK: Body
 
@@ -27,6 +30,7 @@ struct SettingsScreen: View {
                 onboardingSection
                 dataSection
                 aboutSection
+                eraseSection
             }
             .navigationTitle("Settings")
             .sheet(isPresented: $showingSyncHistory) {
@@ -38,6 +42,22 @@ struct SettingsScreen: View {
             } message: {
                 Text(
                     "This will clear all sync history and HealthKit anchors, forcing a full re-sync. Your destination configurations will be preserved."
+                )
+            }
+            .alert("Erase All Data", isPresented: $showingEraseConfirmation) {
+                TextField("Type ERASE to confirm", text: $eraseConfirmationText)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                Button("Erase Everything", role: .destructive) {
+                    eraseAllData()
+                }
+                .disabled(eraseConfirmationText.trimmingCharacters(in: .whitespaces).caseInsensitiveCompare("ERASE") != .orderedSame)
+                Button("Cancel", role: .cancel) {
+                    eraseConfirmationText = ""
+                }
+            } message: {
+                Text(
+                    "This will permanently delete all destinations, credentials, sync history, and settings. This cannot be undone."
                 )
             }
         }
@@ -209,6 +229,25 @@ struct SettingsScreen: View {
         }
     }
 
+    private var eraseSection: some View {
+        Section {
+            Button(role: .destructive) {
+                eraseConfirmationText = ""
+                showingEraseConfirmation = true
+            } label: {
+                Label("Erase All HealthPush Data", systemImage: "trash.fill")
+                    .foregroundStyle(.red)
+            }
+            .accessibilityHint("Permanently deletes all destinations, credentials, sync history, and settings")
+        } header: {
+            Text("Danger Zone")
+        } footer: {
+            Text(
+                "Permanently removes all data including destination credentials stored in the Keychain. You will need to set up HealthPush again from scratch."
+            )
+        }
+    }
+
     // MARK: Bindings
 
     /// Creates a binding for the data retention computed property on AppState.
@@ -254,6 +293,12 @@ struct SettingsScreen: View {
         }
     }
 
+    private func eraseAllData() {
+        BackgroundSyncScheduler.shared.cancelAllTasks()
+        destinationManager.eraseAll(modelContext: modelContext, appState: appState)
+        eraseConfirmationText = ""
+    }
+
     private func resetSyncData() {
         do {
             // Delete all sync records and clear destination-level sync cursors.
@@ -293,5 +338,6 @@ struct SettingsScreen: View {
     SettingsScreen()
         .environment(AppState())
         .environment(SyncEngine())
+        .environment(DestinationManager())
         .modelContainer(for: [SyncRecord.self, DestinationConfig.self], inMemory: true)
 }

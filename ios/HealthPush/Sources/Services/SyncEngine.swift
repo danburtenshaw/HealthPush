@@ -49,7 +49,8 @@ struct SyncResult {
 /// The sync engine is the central coordinator that ties together the HealthKit manager,
 /// destination manager, and SwiftData persistence.
 @MainActor
-final class SyncEngine: Observable {
+@Observable
+final class SyncEngine {
     // MARK: Properties
 
     private let logger = Logger(subsystem: "app.healthpush", category: "SyncEngine")
@@ -143,26 +144,31 @@ final class SyncEngine: Observable {
                 continue
             }
 
-            // Determine lookback window based on destination type.
-            // Home Assistant only needs data since last sync (sends latest value per metric).
-            // S3 always re-syncs 3 days to catch delayed Apple Watch data —
-            // the merge layer deduplicates by UUID so re-syncing is safe and idempotent.
-            let lookbackDate: Date = switch config.destinationType {
-            case .homeAssistant:
-                if let lastSynced = config.lastSyncedAt {
-                    lastSynced
-                } else {
-                    Calendar.current.date(byAdding: .hour, value: -24, to: .now) ?? .now
-                }
-            case .s3:
-                if config.needsFullSync {
-                    // Full sync: query from the configured start date
-                    config.resolvedSyncStartDate
-                } else {
-                    // Incremental: 3-day lookback for delayed Apple Watch data
-                    Calendar.current.date(byAdding: .day, value: -3, to: .now) ?? .now
-                }
+            // Create the destination via the factory — the only place that knows concrete types.
+            let destination: any SyncDestination
+            do {
+                destination = try Self.makeDestination(for: config, networkService: networkService)
+            } catch {
+                failCount += 1
+                errors.append(SyncDestinationError(
+                    destinationName: config.name,
+                    errorDescription: error.localizedDescription
+                ))
+                logger.error("Failed to create destination \(config.name): \(error.localizedDescription)")
+                continue
             }
+
+            // Ask the destination for its query windows — no type switching needed.
+            let now = Date.now
+            let discreteWindow = destination.queryWindow(
+                lastSyncedAt: config.lastSyncedAt,
+                needsFullSync: config.needsFullSync,
+                now: now
+            )
+            let cumulativeWindow = destination.cumulativeQueryWindow(
+                lastSyncedAt: config.lastSyncedAt,
+                now: now
+            ) ?? discreteWindow
 
             // Split metrics: cumulative use statistics aggregation, discrete use raw samples
             let cumulativeMetrics = config.enabledMetrics.filter(\.isCumulative)
@@ -171,12 +177,12 @@ final class SyncEngine: Observable {
             var dataPoints: [HealthDataPoint] = []
             var queryIssues: [HealthMetricQueryIssue] = []
 
-            // Query discrete metrics with the destination's standard lookback
+            // Query discrete metrics with the destination's query window
             if !discreteMetrics.isEmpty {
                 let discrete = await healthKitManager.queryData(
                     for: discreteMetrics,
-                    from: lookbackDate,
-                    to: .now
+                    from: discreteWindow.start,
+                    to: discreteWindow.end
                 )
                 dataPoints.append(contentsOf: discrete.dataPoints)
                 queryIssues.append(contentsOf: discrete.issues)
@@ -184,26 +190,16 @@ final class SyncEngine: Observable {
 
             // Query cumulative metrics using HKStatisticsCollectionQuery for deduplicated totals
             if !cumulativeMetrics.isEmpty {
-                // For HA, query from start-of-today so the value represents the
-                // full day's total ("8,432 steps today"), not a partial delta.
-                // For S3, use the same lookback as discrete metrics.
-                let cumulativeLookback: Date = switch config.destinationType {
-                case .homeAssistant:
-                    Calendar.current.startOfDay(for: .now)
-                case .s3:
-                    lookbackDate
-                }
-
                 let aggregated = await healthKitManager.queryDailyStatistics(
                     for: cumulativeMetrics,
-                    from: cumulativeLookback,
-                    to: .now
+                    from: cumulativeWindow.start,
+                    to: cumulativeWindow.end
                 )
                 dataPoints.append(contentsOf: aggregated.dataPoints)
                 queryIssues.append(contentsOf: aggregated.issues)
             }
 
-            logger.info("Queried \(dataPoints.count) data points for \(config.name) (since \(lookbackDate))")
+            logger.info("Queried \(dataPoints.count) data points for \(config.name) (since \(discreteWindow.start))")
 
             let record = SyncRecord(
                 destinationName: config.name,
@@ -222,18 +218,7 @@ final class SyncEngine: Observable {
                     }
                 }
 
-                let stats: SyncStats
-                switch config.destinationType {
-                case .homeAssistant:
-                    let destination = try HomeAssistantDestination(
-                        config: config,
-                        networkService: networkService
-                    )
-                    stats = try await destination.sync(data: dataPoints, onProgress: progressCallback)
-                case .s3:
-                    let destination = try S3Destination(config: config)
-                    stats = try await destination.sync(data: dataPoints, onProgress: progressCallback)
-                }
+                let stats = try await destination.sync(data: dataPoints, onProgress: progressCallback)
 
                 totalDataPoints += stats.newCount
                 record.dataPointCount = stats.newCount
@@ -252,8 +237,13 @@ final class SyncEngine: Observable {
                         .sorted { $0.metric.rawValue < $1.metric.rawValue }
                         .map { "\($0.metric.displayName): \($0.errorDescription)" }
                         .joined(separator: "\n")
+                    let failure = SyncFailure.partial(
+                        successes: stats.newCount,
+                        failures: queryIssues.count,
+                        message: queryMessage
+                    )
                     record.status = .partialFailure
-                    record.errorMessage = queryMessage
+                    record.applyFailure(failure)
                     failCount += 1
                     errors.append(SyncDestinationError(
                         destinationName: config.name,
@@ -262,13 +252,14 @@ final class SyncEngine: Observable {
                     logger.error("Sync partially failed for \(config.name): \(queryMessage)")
                 }
             } catch {
+                let failure = destination.classifyError(error)
                 record.status = .failure
-                record.errorMessage = error.localizedDescription
+                record.applyFailure(failure)
                 record.duration = Date().timeIntervalSince(startTime)
                 failCount += 1
-                errors.append(SyncDestinationError(destinationName: config.name, errorDescription: error.localizedDescription))
+                errors.append(SyncDestinationError(destinationName: config.name, errorDescription: failure.displayMessage))
 
-                logger.error("Sync failed for \(config.name): \(error.localizedDescription)")
+                logger.error("Sync failed for \(config.name) [\(failure.categoryRaw)]: \(failure.displayMessage)")
             }
         }
 
@@ -278,6 +269,9 @@ final class SyncEngine: Observable {
         } catch {
             logger.error("Failed to save sync records: \(error.localizedDescription)")
         }
+
+        // Prune sync records older than 30 days to limit store growth
+        pruneOldSyncRecords(modelContext: modelContext)
 
         let duration = Date().timeIntervalSince(startTime)
         logger.info("Sync completed in \(String(format: "%.1f", duration))s: \(successCount) succeeded, \(failCount) failed")
@@ -318,4 +312,45 @@ final class SyncEngine: Observable {
     func resetAnchors() async {
         await healthKitManager?.resetAnchors()
     }
+
+    // MARK: Record Retention
+
+    /// Deletes sync records older than 30 days to prevent unbounded store growth.
+    private func pruneOldSyncRecords(modelContext: ModelContext) {
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
+        let descriptor = FetchDescriptor<SyncRecord>(
+            predicate: #Predicate<SyncRecord> { $0.timestamp < thirtyDaysAgo }
+        )
+
+        do {
+            let oldRecords = try modelContext.fetch(descriptor)
+            guard !oldRecords.isEmpty else { return }
+            for record in oldRecords {
+                modelContext.delete(record)
+            }
+            try modelContext.save()
+            logger.info("Pruned \(oldRecords.count) sync records older than 30 days")
+        } catch {
+            logger.error("Failed to prune old sync records: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: Destination Factory
+
+    /// Creates a ``SyncDestination`` from a persisted configuration.
+    ///
+    /// This is the **only** place in SyncEngine that switches on destination type.
+    /// Everything else flows through the ``SyncDestination`` protocol.
+    private static func makeDestination(
+        for config: DestinationConfig,
+        networkService: NetworkService
+    ) throws -> any SyncDestination {
+        switch config.destinationType {
+        case .homeAssistant:
+            try HomeAssistantDestination(config: config, networkService: networkService)
+        case .s3:
+            try S3Destination(config: config)
+        }
+    }
+
 }

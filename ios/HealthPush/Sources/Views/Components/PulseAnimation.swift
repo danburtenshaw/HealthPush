@@ -12,6 +12,8 @@ struct PulseAnimation: View {
     let color: Color
     let isAnimating: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     @State private var scale1: CGFloat = 0.5
     @State private var opacity1 = 0.8
     @State private var scale2: CGFloat = 0.5
@@ -21,24 +23,31 @@ struct PulseAnimation: View {
 
     var body: some View {
         ZStack {
-            // Outer pulse ring
-            Circle()
-                .fill(color.opacity(opacity1))
-                .scaleEffect(scale1)
+            if reduceMotion {
+                Circle()
+                    .fill(color)
+                    .frame(width: 20, height: 20)
+            } else {
+                // Outer pulse ring
+                Circle()
+                    .fill(color.opacity(opacity1))
+                    .scaleEffect(scale1)
 
-            // Inner pulse ring
-            Circle()
-                .fill(color.opacity(opacity2))
-                .scaleEffect(scale2)
+                // Inner pulse ring
+                Circle()
+                    .fill(color.opacity(opacity2))
+                    .scaleEffect(scale2)
 
-            // Center dot
-            Circle()
-                .fill(color)
-                .frame(width: 12, height: 12)
+                // Center dot
+                Circle()
+                    .fill(color)
+                    .frame(width: 12, height: 12)
+            }
         }
         .frame(width: 60, height: 60)
         .accessibilityHidden(true)
         .onChange(of: isAnimating, initial: true) { _, animating in
+            guard !reduceMotion else { return }
             if animating {
                 startAnimation()
             } else {

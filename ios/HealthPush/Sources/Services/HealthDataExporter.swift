@@ -121,8 +121,12 @@ struct HealthDataExporter {
         return try encoder.encode(points)
     }
 
-    /// Decodes data points from JSON, returning an empty array on failure.
-    func decodeJSON(_ data: Data) -> [HealthDataPoint] {
+    /// Decodes data points from JSON.
+    ///
+    /// - Parameter data: The raw JSON data to decode.
+    /// - Returns: The decoded health data points.
+    /// - Throws: `DecodingError` if the JSON is malformed or contains unexpected values.
+    func decodeJSON(_ data: Data) throws -> [HealthDataPoint] {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
@@ -135,14 +139,7 @@ struct HealthDataExporter {
             }
             return date
         }
-        do {
-            return try decoder.decode([HealthDataPoint].self, from: data)
-        } catch {
-            #if canImport(os)
-            logger.warning("Failed to decode JSON health data: \(error.localizedDescription)")
-            #endif
-            return []
-        }
+        return try decoder.decode([HealthDataPoint].self, from: data)
     }
 
     // MARK: - CSV Serialization
@@ -220,7 +217,7 @@ struct HealthDataExporter {
         let existing: [HealthDataPoint] = if let data = existingData {
             switch format {
             case .json:
-                decodeJSON(data)
+                try decodeJSON(data)
             case .csv:
                 decodeCSV(data)
             }
@@ -251,49 +248,11 @@ struct HealthDataExporter {
     ///   - ext: File extension (json or csv).
     /// - Returns: The full key path, e.g. `my-data/2026-04-03/heart_rate.json`.
     static func buildKey(prefix: String, dateString: String, metricType: HealthMetricType, ext: String) -> String {
-        let fileName = "\(metricType.sensorEntitySuffix).\(ext)"
+        let fileName = "\(metricType.fileStem).\(ext)"
         if prefix.isEmpty {
             return "\(dateString)/\(fileName)"
         }
         return "\(prefix)/\(dateString)/\(fileName)"
-    }
-
-    // MARK: - Validation
-
-    /// Validates a user-provided path prefix.
-    /// Returns nil if valid, or an error message string if invalid.
-    static func validatePathPrefix(_ prefix: String) -> String? {
-        if prefix.isEmpty { return nil }
-        if prefix.hasPrefix("/") { return "Path cannot start with /" }
-        if prefix.hasSuffix("/") { return "Path cannot end with /" }
-        if prefix.contains("//") { return "Path cannot contain //" }
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_./"))
-        if prefix.unicodeScalars.contains(where: { !allowed.contains($0) }) {
-            return "Only letters, numbers, hyphens, underscores, dots, and slashes allowed"
-        }
-        if prefix.count > 256 { return "Path cannot exceed 256 characters" }
-        return nil
-    }
-
-    /// Validates an S3 bucket name per AWS naming rules.
-    /// Returns nil if valid, or an error message string if invalid.
-    static func validateBucketName(_ name: String) -> String? {
-        if name.isEmpty { return "Bucket name is required" }
-        if name.count < 3 { return "Bucket name must be at least 3 characters" }
-        if name.count > 63 { return "Bucket name cannot exceed 63 characters" }
-        let allowed = CharacterSet.lowercaseLetters
-            .union(.decimalDigits)
-            .union(CharacterSet(charactersIn: "-."))
-        if name.unicodeScalars.contains(where: { !allowed.contains($0) }) {
-            return "Only lowercase letters, numbers, hyphens, and dots allowed"
-        }
-        if name.hasPrefix("-") || name.hasPrefix(".") {
-            return "Bucket name must start with a letter or number"
-        }
-        if name.hasSuffix("-") || name.hasSuffix(".") {
-            return "Bucket name must end with a letter or number"
-        }
-        return nil
     }
 
     // MARK: - Private CSV Helpers

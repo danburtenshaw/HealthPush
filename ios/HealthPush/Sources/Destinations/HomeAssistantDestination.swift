@@ -2,10 +2,6 @@ import Foundation
 import HealthKit
 import os
 
-#if canImport(UIKit)
-import UIKit
-#endif
-
 // MARK: - HomeAssistantError
 
 /// Errors specific to Home Assistant webhook operations.
@@ -56,45 +52,66 @@ struct HomeAssistantDestination: SyncDestination {
     // MARK: Initialization
 
     /// Creates a Home Assistant destination from a persisted configuration.
-    ///
-    /// The `DestinationConfig.baseURL` field stores the full webhook URL,
-    /// and `DestinationConfig.apiToken` stores the webhook secret.
-    ///
-    /// - Parameters:
-    ///   - config: The SwiftData destination configuration.
-    ///   - networkService: The network service to use for HTTP requests.
-    init(
-        config: DestinationConfig,
-        networkService: NetworkService = NetworkService(),
-        migrateSecretsIfNeeded: Bool = true
-    ) throws {
+    init(config: DestinationConfig, networkService: NetworkService = NetworkService()) throws {
         id = config.id
         name = config.name
         isEnabled = config.isEnabled
-        webhookURL = config.baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        webhookSecret = try config.apiTokenValue(migratingIfNeeded: migrateSecretsIfNeeded)
+        let haConfig = try config.homeAssistantConfig
+        webhookURL = haConfig.webhookURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        webhookSecret = try config.credential(for: CredentialField.webhookSecret)
         enabledMetrics = config.enabledMetrics
         self.networkService = networkService
     }
 
+    /// Creates a destination for connection testing without a persisted config.
+    init(webhookURL: String, webhookSecret: String, networkService: NetworkService = NetworkService()) {
+        id = UUID()
+        name = "Connection Test"
+        isEnabled = true
+        self.webhookURL = webhookURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        self.webhookSecret = webhookSecret
+        enabledMetrics = []
+        self.networkService = networkService
+    }
+
     // MARK: SyncDestination
+
+    var capabilities: SyncCapabilities {
+        SyncCapabilities(supportsIncremental: true, isIdempotent: false, isFireAndForget: true, maxBatchSize: nil)
+    }
+
+    func queryWindow(lastSyncedAt: Date?, needsFullSync: Bool, now: Date) -> QueryWindow {
+        let start = lastSyncedAt ?? Calendar.current.date(byAdding: .hour, value: -24, to: now) ?? now
+        return QueryWindow(start: start, end: now)
+    }
+
+    func cumulativeQueryWindow(lastSyncedAt: Date?, now: Date) -> QueryWindow? {
+        // HA sends the full day's cumulative total ("8,432 steps today")
+        QueryWindow(start: Calendar.current.startOfDay(for: now), end: now)
+    }
+
+    func classifyError(_ error: Error) -> SyncFailure {
+        switch error {
+        case HomeAssistantError.authenticationFailed:
+            .permanent(message: error.localizedDescription, recovery: .reauthenticate)
+        case HomeAssistantError.invalidConfiguration:
+            .permanent(message: error.localizedDescription, recovery: .fixURL)
+        default:
+            SyncFailure.classifyNetworkError(error)
+        }
+    }
 
     // Syncs health data points to Home Assistant via a single webhook POST.
     //
     // All enabled metrics are batched into one request. The webhook payload
     // contains the device name, a timestamp, and an array of metric objects.
     //
-    // - Parameter data: The health data points to sync.
+    // - Parameters:
+    //   - data: The health data points to sync.
+    //   - onProgress: Optional callback reporting (completedBatches, totalBatches).
     // - Throws: ``HomeAssistantError`` if the webhook URL is empty or the request fails.
 
-    /// Progress callback: (completedBatches, totalBatches)
-    typealias ProgressHandler = @Sendable (Int, Int) -> Void
-
-    func sync(data: [HealthDataPoint]) async throws -> SyncStats {
-        try await sync(data: data, onProgress: nil)
-    }
-
-    func sync(data: [HealthDataPoint], onProgress: ProgressHandler?) async throws -> SyncStats {
+    func sync(data: [HealthDataPoint], onProgress: (@Sendable (Int, Int) -> Void)?) async throws -> SyncStats {
         guard !webhookURL.isEmpty else {
             throw HomeAssistantError.invalidConfiguration("Webhook URL is empty.")
         }
@@ -114,8 +131,8 @@ struct HomeAssistantDestination: SyncDestination {
         }
 
         // Single request — one value per metric is small enough
-        let payload: [String: Any] = await [
-            "device_name": MainActor.run { Self.currentDeviceName },
+        let payload: [String: Any] = [
+            "device_name": Self.deviceName,
             "timestamp": formatter.string(from: Date()),
             "metrics": metrics
         ]
@@ -208,15 +225,12 @@ struct HomeAssistantDestination: SyncDestination {
         return headers
     }
 
-    /// The current device name, used in the webhook payload.
-    @MainActor
-    private static var currentDeviceName: String {
-        #if canImport(UIKit)
-        return UIDevice.current.name
-        #else
-        return Host.current().localizedName ?? "Mac"
-        #endif
-    }
+    /// The device name sent in the webhook payload.
+    ///
+    /// Uses a hardcoded default instead of `UIDevice.current.name` to avoid
+    /// leaking the user's personal device name (e.g. "Dan's iPhone").
+    /// A user-configurable sensor label can be added in a future release.
+    private static let deviceName = "HealthPush"
 
     static func buildMetricPayloads(
         from data: [HealthDataPoint],
@@ -265,7 +279,7 @@ struct HomeAssistantDestination: SyncDestination {
 
         return [
             "id": aggregateID.uuidString,
-            "type": HealthMetricType.sleepAnalysis.sensorEntitySuffix,
+            "type": HealthMetricType.sleepAnalysis.fileStem,
             "value": (totalHours * 100).rounded() / 100,
             "unit": HealthMetricType.sleepAnalysis.unitString,
             "start_date": formatter.string(from: firstInterval.start),
@@ -338,7 +352,7 @@ struct HomeAssistantDestination: SyncDestination {
 
         return [
             "id": point.id.uuidString,
-            "type": point.metricType.sensorEntitySuffix,
+            "type": point.metricType.fileStem,
             "value": roundedValue,
             "unit": point.metricType == .sleepAnalysis ? "hr" : point.unit,
             "start_date": formatter.string(from: point.timestamp),

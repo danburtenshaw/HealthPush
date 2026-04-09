@@ -50,50 +50,56 @@ struct S3Destination: SyncDestination {
     let name: String
     let isEnabled: Bool
 
+    /// The resolved start date for full syncs, captured at init from the S3 type config.
+    private let fullSyncStartDate: Date
+
     private let syncService: S3SyncService
     private let logger = Logger(subsystem: "app.healthpush", category: "S3Destination")
-
-    /// Progress callback: (filesCompleted, totalFiles).
-    typealias ProgressHandler = @Sendable (Int, Int) -> Void
 
     // MARK: Initialization
 
     /// Creates an S3 destination from a persisted configuration.
-    ///
-    /// Field mapping from ``DestinationConfig``:
-    /// - `baseURL` → S3 bucket name
-    /// - `apiToken` → AWS access key ID
-    /// - `s3SecretAccessKey` → AWS secret access key
-    /// - `s3Region` → S3 signing region
-    /// - `s3PathPrefix` → Object key prefix
-    /// - `s3Endpoint` → Optional custom S3-compatible endpoint
-    /// - `s3ExportFormatRaw` → Export format
-    init(config: DestinationConfig, migrateSecretsIfNeeded: Bool = true) throws {
+    init(config: DestinationConfig) throws {
         id = config.id
         name = config.name
         isEnabled = config.isEnabled
+        let s3Config = try config.s3Config
+        fullSyncStartDate = s3Config.resolvedSyncStartDate
         let s3Client = try S3Client(
-            bucket: config.baseURL,
-            region: config.s3Region.isEmpty ? "us-east-1" : config.s3Region,
-            accessKeyID: config.apiTokenValue(migratingIfNeeded: migrateSecretsIfNeeded),
-            secretAccessKey: config.s3SecretAccessKeyValue(migratingIfNeeded: migrateSecretsIfNeeded),
-            endpointOverride: config.s3Endpoint
+            bucket: s3Config.bucket,
+            region: s3Config.region.isEmpty ? "us-east-1" : s3Config.region,
+            accessKeyID: config.credential(for: CredentialField.accessKeyID),
+            secretAccessKey: config.credential(for: CredentialField.secretAccessKey),
+            endpointOverride: s3Config.endpoint
         )
         syncService = S3SyncService(
             s3Client: s3Client,
-            pathPrefix: config.s3PathPrefix,
-            exportFormat: config.exportFormat
+            pathPrefix: s3Config.pathPrefix,
+            exportFormat: s3Config.exportFormat
         )
     }
 
     // MARK: SyncDestination
 
-    func sync(data: [HealthDataPoint]) async throws -> SyncStats {
-        try await sync(data: data, onProgress: nil)
+    var capabilities: SyncCapabilities {
+        SyncCapabilities(supportsIncremental: false, isIdempotent: true, isFireAndForget: false, maxBatchSize: nil)
+    }
+
+    func queryWindow(lastSyncedAt: Date?, needsFullSync: Bool, now: Date) -> QueryWindow {
+        if needsFullSync {
+            return QueryWindow(start: fullSyncStartDate, end: now)
+        }
+        // 3-day rolling lookback for delayed Apple Watch data
+        let start = Calendar.current.date(byAdding: .day, value: -3, to: now) ?? now
+        return QueryWindow(start: start, end: now)
+    }
+
+    func cumulativeQueryWindow(lastSyncedAt: Date?, now: Date) -> QueryWindow? {
+        nil // S3 uses the same window for cumulative and discrete
     }
 
     /// Syncs health data to S3 with progress reporting.
-    func sync(data: [HealthDataPoint], onProgress: ProgressHandler?) async throws -> SyncStats {
+    func sync(data: [HealthDataPoint], onProgress: (@Sendable (Int, Int) -> Void)?) async throws -> SyncStats {
         let stats = try await syncService.sync(data: data, onProgress: onProgress)
         logger.info("S3 destination sync complete: \(stats.newCount) new/updated")
         return SyncStats(processedCount: stats.processedCount, newCount: stats.newCount)
@@ -101,5 +107,17 @@ struct S3Destination: SyncDestination {
 
     func testConnection() async throws -> Bool {
         try await syncService.testConnection()
+    }
+
+    func classifyError(_ error: Error) -> SyncFailure {
+        if let s3Error = error as? S3DestinationError {
+            switch s3Error {
+            case .invalidConfiguration:
+                return .permanent(message: error.localizedDescription, recovery: .fixBucketConfig)
+            case .syncFailed:
+                return SyncFailure.classifyNetworkError(error)
+            }
+        }
+        return SyncFailure.classifyNetworkError(error)
     }
 }

@@ -99,10 +99,10 @@ struct HealthMetricTypeTests {
         }
     }
 
-    @Test("All metrics have non-empty sensor entity suffixes")
-    func sensorEntitySuffixes() {
+    @Test("All metrics have non-empty file stems")
+    func fileStems() {
         for metric in HealthMetricType.allCases {
-            #expect(!metric.sensorEntitySuffix.isEmpty, "\(metric.rawValue) has empty sensor suffix")
+            #expect(!metric.fileStem.isEmpty, "\(metric.rawValue) has empty file stem")
         }
     }
 

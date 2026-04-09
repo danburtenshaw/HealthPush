@@ -19,10 +19,9 @@ struct S3DestinationIntegrationTests {
     @Test("MinIO connection test succeeds")
     func connectionAgainstMinIO() async throws {
         let integration = minioIntegration()
-        let destination = try S3Destination(
-            config: makeConfig(integration: integration, pathPrefix: uniquePrefix("connection")),
-            migrateSecretsIfNeeded: false
-        )
+        let config = makeConfig(integration: integration, pathPrefix: uniquePrefix("connection"))
+        defer { try? config.deleteAllCredentials() }
+        let destination = try S3Destination(config: config)
 
         #expect(try await destination.testConnection())
     }
@@ -32,7 +31,8 @@ struct S3DestinationIntegrationTests {
         let integration = minioIntegration()
         let prefix = uniquePrefix("json")
         let config = makeConfig(integration: integration, pathPrefix: prefix, exportFormat: .json)
-        let destination = try S3Destination(config: config, migrateSecretsIfNeeded: false)
+        defer { try? config.deleteAllCredentials() }
+        let destination = try S3Destination(config: config)
 
         let firstID = UUID()
         let secondID = UUID()
@@ -70,7 +70,8 @@ struct S3DestinationIntegrationTests {
         let integration = minioIntegration()
         let prefix = uniquePrefix("csv")
         let config = makeConfig(integration: integration, pathPrefix: prefix, exportFormat: .csv)
-        let destination = try S3Destination(config: config, migrateSecretsIfNeeded: false)
+        defer { try? config.deleteAllCredentials() }
+        let destination = try S3Destination(config: config)
 
         let data = [
             makePoint(id: UUID(), metricType: .steps, value: 4321),
@@ -120,7 +121,7 @@ struct S3DestinationIntegrationTests {
 
         switch format {
         case .json:
-            return exporter.decodeJSON(storedData)
+            return try exporter.decodeJSON(storedData)
         case .csv:
             return exporter.decodeCSV(storedData)
         }
@@ -131,18 +132,23 @@ struct S3DestinationIntegrationTests {
         pathPrefix: String,
         exportFormat: ExportFormat = .json
     ) -> DestinationConfig {
-        DestinationConfig(
+        let config = DestinationConfig(
             name: "MinIO",
             destinationType: .s3,
-            baseURL: integration.bucket,
-            apiToken: integration.accessKeyID,
-            enabledMetrics: [.heartRate, .steps],
-            s3Region: integration.region,
-            s3SecretAccessKey: integration.secretAccessKey,
-            s3PathPrefix: pathPrefix,
-            s3Endpoint: integration.endpoint,
-            s3ExportFormat: exportFormat
+            typeConfig: .s3(S3TypeConfig(
+                bucket: integration.bucket,
+                region: integration.region,
+                endpoint: integration.endpoint,
+                pathPrefix: pathPrefix,
+                exportFormatRaw: exportFormat.rawValue,
+                syncStartDateOptionRaw: SyncStartDateOption.last7Days.rawValue,
+                syncStartDateCustom: nil
+            )),
+            enabledMetrics: [.heartRate, .steps]
         )
+        try? config.setCredential(integration.accessKeyID, for: CredentialField.accessKeyID)
+        try? config.setCredential(integration.secretAccessKey, for: CredentialField.secretAccessKey)
+        return config
     }
 
     private func makePoint(

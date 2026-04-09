@@ -63,12 +63,12 @@ struct DestinationCard: View {
                     }
                 }
 
-                Text(syncSummary)
+                syncSummaryView
                     .font(.caption2)
                     .foregroundStyle(syncSummaryColor)
 
-                if !config.baseURL.isEmpty {
-                    Text(sanitizedURL)
+                if let urlText = sanitizedURL, !urlText.isEmpty {
+                    Text(urlText)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
@@ -120,26 +120,48 @@ struct DestinationCard: View {
     }
 
     /// Shows a sanitized summary of the destination address.
-    private var sanitizedURL: String {
+    private var sanitizedURL: String? {
         switch config.destinationType {
         case .homeAssistant:
-            guard let url = URL(string: config.baseURL) else { return config.baseURL }
+            guard let haConfig = try? config.homeAssistantConfig else { return nil }
+            let urlString = haConfig.webhookURL
+            guard !urlString.isEmpty else { return nil }
+            guard let url = URL(string: urlString) else { return urlString }
             if let host = url.host() {
                 let scheme = url.scheme ?? "http"
                 let port = url.port.map { ":\($0)" } ?? ""
                 return "\(scheme)://\(host)\(port)"
             }
-            return config.baseURL
+            return urlString
         case .s3:
-            let prefix = config.s3PathPrefix.isEmpty ? "" : "/\(config.s3PathPrefix)"
-            if !config.s3Endpoint.isEmpty {
-                let endpoint = S3Client.normalizedEndpoint(config.s3Endpoint)
-                return "\(endpoint)/\(config.baseURL)\(prefix)"
+            guard let s3Config = try? config.s3Config else { return nil }
+            let prefix = s3Config.pathPrefix.isEmpty ? "" : "/\(s3Config.pathPrefix)"
+            if !s3Config.endpoint.isEmpty {
+                let endpoint = S3Client.normalizedEndpoint(s3Config.endpoint)
+                return "\(endpoint)/\(s3Config.bucket)\(prefix)"
             }
-            return "s3://\(config.baseURL)\(prefix)"
+            return "s3://\(s3Config.bucket)\(prefix)"
         }
     }
 
+    /// A view that shows the sync summary with live-updating relative timestamps.
+    /// Uses `Text(date, style: .relative)` so the displayed time updates automatically.
+    @ViewBuilder
+    private var syncSummaryView: some View {
+        if config.needsFullSync {
+            if config.lastSyncedAt == nil {
+                Text("Initial sync pending")
+            } else {
+                Text("Full re-sync queued")
+            }
+        } else if let lastSyncedAt = config.lastSyncedAt {
+            Text("Last synced ") + Text(lastSyncedAt, style: .relative) + Text(" ago")
+        } else {
+            Text("Ready for first sync")
+        }
+    }
+
+    /// Static string version of the sync summary for accessibility labels.
     private var syncSummary: String {
         if config.needsFullSync {
             if config.lastSyncedAt == nil {
@@ -169,16 +191,14 @@ struct DestinationCard: View {
         DestinationCard(config: DestinationConfig(
             name: "Home Assistant",
             destinationType: .homeAssistant,
-            baseURL: "http://homeassistant.local:8123",
-            apiToken: "abc123"
+            typeConfig: .homeAssistant(HomeAssistantTypeConfig(webhookURL: "http://homeassistant.local:8123"))
         ))
 
         DestinationCard(config: {
             let c = DestinationConfig(
                 name: "Office HA",
                 destinationType: .homeAssistant,
-                baseURL: "https://ha.example.com",
-                apiToken: "xyz"
+                typeConfig: .homeAssistant(HomeAssistantTypeConfig(webhookURL: "https://ha.example.com"))
             )
             c.isEnabled = false
             return c

@@ -108,6 +108,30 @@ enum KeychainService {
         }
     }
 
+    /// Deletes all Keychain items in the HealthPush service.
+    /// Used during data erasure and on first launch after a fresh install to clean up
+    /// orphaned items from a previous installation.
+    static func deleteAllServiceItems() throws {
+        if shouldUseFallbackStore {
+            fallbackStore.deleteAll()
+            return
+        }
+
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        if status == missingEntitlementStatus && isRunningTests {
+            fallbackStore.deleteAll()
+            return
+        }
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainError.unexpectedStatus(status)
+        }
+    }
+
     private static var shouldUseFallbackStore: Bool {
         isRunningTests
     }
@@ -139,5 +163,11 @@ private final class InMemorySecretStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         values.removeValue(forKey: key)
+    }
+
+    func deleteAll() {
+        lock.lock()
+        defer { lock.unlock() }
+        values.removeAll()
     }
 }

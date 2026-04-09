@@ -63,19 +63,6 @@ final class DestinationManager {
         )
         do {
             destinations = try modelContext.fetch(descriptor)
-            var didMigrateSecrets = false
-            for config in destinations {
-                do {
-                    let hadPlaintextSecrets = !config.apiToken.isEmpty || !config.s3SecretAccessKey.isEmpty
-                    try config.secureStoredSecretsIfNeeded()
-                    didMigrateSecrets = didMigrateSecrets || hadPlaintextSecrets
-                } catch {
-                    logger.error("Failed to migrate secrets for \(config.name): \(error.localizedDescription)")
-                }
-            }
-            if didMigrateSecrets {
-                try modelContext.save()
-            }
         } catch {
             logger.error("Failed to fetch destinations: \(error.localizedDescription)")
             destinations = []
@@ -84,40 +71,37 @@ final class DestinationManager {
 
     // MARK: CRUD Operations
 
-    /// Creates a new Home Assistant destination.
-    /// - Parameters:
-    ///   - name: Display name.
-    ///   - baseURL: The Home Assistant base URL.
-    ///   - apiToken: Long-lived access token.
-    ///   - enabledMetrics: Which metrics to sync.
-    ///   - modelContext: The SwiftData model context.
-    /// - Returns: The created configuration.
+    /// Creates a new destination with the given configuration.
     @discardableResult
-    func createHomeAssistantDestination(
+    func createDestination(
         name: String,
-        baseURL: String,
-        apiToken: String,
+        type: DestinationType,
+        typeConfig: TypeSpecificConfig,
+        credentials: [String: String],
         enabledMetrics: Set<HealthMetricType>,
         syncFrequency: SyncFrequency = .oneHour,
         modelContext: ModelContext
     ) throws -> DestinationConfig {
         let config = DestinationConfig(
             name: name,
-            destinationType: .homeAssistant,
-            baseURL: baseURL,
-            apiToken: apiToken,
+            destinationType: type,
+            typeConfig: typeConfig,
             enabledMetrics: enabledMetrics
         )
         config.syncFrequency = syncFrequency
         modelContext.insert(config)
 
         do {
-            try config.secureStoredSecretsIfNeeded()
+            for (field, value) in credentials where !value.isEmpty {
+                try config.setCredential(value, for: field)
+            }
             try modelContext.save()
             loadDestinations(modelContext: modelContext)
             onDestinationsChanged?()
             logger.info("Created destination: \(name)")
         } catch {
+            // Rollback: clean up any credentials we stored, then remove the model
+            try? config.deleteAllCredentials()
             modelContext.delete(config)
             logger.error("Failed to save destination: \(error.localizedDescription)")
             if error is KeychainError {
@@ -136,7 +120,6 @@ final class DestinationManager {
     func updateDestination(_ config: DestinationConfig, modelContext: ModelContext) throws {
         config.modifiedAt = .now
         do {
-            try config.secureStoredSecretsIfNeeded()
             try modelContext.save()
             loadDestinations(modelContext: modelContext)
             onDestinationsChanged?()
@@ -155,8 +138,7 @@ final class DestinationManager {
     ///   - config: The configuration to delete.
     ///   - modelContext: The SwiftData model context.
     func deleteDestination(_ config: DestinationConfig, modelContext: ModelContext) throws {
-        let apiTokenKeychainKey = config.apiTokenKeychainKey
-        let s3SecretAccessKeyKeychainKey = config.s3SecretAccessKeyKeychainKey
+        let credentialKeysSnapshot = config.credentialKeys
         let destinationID = config.id
 
         let descriptor = FetchDescriptor<SyncRecord>(
@@ -176,11 +158,8 @@ final class DestinationManager {
             loadDestinations(modelContext: modelContext)
             onDestinationsChanged?()
 
-            if let apiTokenKeychainKey {
-                try? KeychainService.delete(apiTokenKeychainKey)
-            }
-            if let s3SecretAccessKeyKeychainKey {
-                try? KeychainService.delete(s3SecretAccessKeyKeychainKey)
+            for (_, keychainKey) in credentialKeysSnapshot {
+                try? KeychainService.delete(keychainKey)
             }
 
             logger.info("Deleted destination and its sync history: \(config.name)")
@@ -190,59 +169,83 @@ final class DestinationManager {
         }
     }
 
-    // MARK: S3 Destination
+    // MARK: Data Erasure
 
-    /// Creates a new S3 destination.
-    @discardableResult
-    func createS3Destination(
-        name: String,
-        bucket: String,
-        region: String,
-        endpoint: String,
-        accessKeyID: String,
-        secretAccessKey: String,
-        pathPrefix: String,
-        exportFormat: ExportFormat,
-        enabledMetrics: Set<HealthMetricType>,
-        syncFrequency: SyncFrequency = .oneHour,
-        syncStartDateOption: SyncStartDateOption = .last7Days,
-        syncStartDateCustom: Date? = nil,
-        modelContext: ModelContext
-    ) throws -> DestinationConfig {
-        let config = DestinationConfig(
-            name: name,
-            destinationType: .s3,
-            baseURL: bucket,
-            apiToken: accessKeyID,
-            enabledMetrics: enabledMetrics,
-            s3Region: region,
-            s3SecretAccessKey: secretAccessKey,
-            s3PathPrefix: pathPrefix,
-            s3Endpoint: endpoint,
-            s3ExportFormat: exportFormat
-        )
-        config.syncFrequency = syncFrequency
-        config.syncStartDateOption = syncStartDateOption
-        config.syncStartDateCustom = syncStartDateCustom
-        config.needsFullSync = true
-        modelContext.insert(config)
-
-        do {
-            try config.secureStoredSecretsIfNeeded()
-            try modelContext.save()
-            loadDestinations(modelContext: modelContext)
-            onDestinationsChanged?()
-            logger.info("Created S3 destination: \(name)")
-        } catch {
-            modelContext.delete(config)
-            logger.error("Failed to save S3 destination: \(error.localizedDescription)")
-            if error is KeychainError {
-                throw DestinationManagerError.secretStorageFailed(error.localizedDescription)
+    /// Performs a complete erasure of all HealthPush data.
+    ///
+    /// This method is best-effort: if any step fails it logs the error and
+    /// continues with the remaining steps so that as much data as possible is removed.
+    ///
+    /// Steps performed:
+    /// 1. Delete all Keychain entries for every destination.
+    /// 2. Delete all ``SyncRecord`` objects from SwiftData.
+    /// 3. Delete all ``DestinationConfig`` objects from SwiftData.
+    /// 4. Save the model context.
+    /// 5. Clear the in-memory destinations array.
+    /// 6. Reset ``AppState`` to factory defaults.
+    ///
+    /// - Parameters:
+    ///   - modelContext: The SwiftData model context.
+    ///   - appState: The app state to reset.
+    func eraseAll(modelContext: ModelContext, appState: AppState) {
+        // 1. Delete all Keychain entries for every destination
+        for config in destinations {
+            for (_, keychainKey) in config.credentialKeys {
+                do {
+                    try KeychainService.delete(keychainKey)
+                } catch {
+                    logger.error("Failed to delete keychain item \(keychainKey): \(error.localizedDescription)")
+                }
             }
-            throw DestinationManagerError.persistenceFailed(error.localizedDescription)
         }
 
-        return config
+        // Belt-and-suspenders: sweep the entire service to catch any orphans
+        do {
+            try KeychainService.deleteAllServiceItems()
+        } catch {
+            logger.error("Failed to sweep keychain service items: \(error.localizedDescription)")
+        }
+
+        // 2. Delete all SyncRecord objects
+        do {
+            try modelContext.delete(model: SyncRecord.self)
+        } catch {
+            logger.error("Failed to delete sync records: \(error.localizedDescription)")
+        }
+
+        // 3. Delete all DestinationConfig objects
+        do {
+            try modelContext.delete(model: DestinationConfig.self)
+        } catch {
+            logger.error("Failed to delete destination configs: \(error.localizedDescription)")
+        }
+
+        // 4. Save the context
+        do {
+            try modelContext.save()
+        } catch {
+            logger.error("Failed to save model context after erasure: \(error.localizedDescription)")
+        }
+
+        // 5. Clear in-memory destinations
+        destinations = []
+
+        // 6. Reset AppState to factory defaults
+        appState.resetToDefaults()
+
+        logger.info("Completed full data erasure")
+    }
+
+    // MARK: Destination Factory
+
+    /// Creates a ``SyncDestination`` instance from a persisted configuration.
+    func makeDestination(for config: DestinationConfig) throws -> any SyncDestination {
+        switch config.destinationType {
+        case .homeAssistant:
+            try HomeAssistantDestination(config: config, networkService: networkService)
+        case .s3:
+            try S3Destination(config: config)
+        }
     }
 
     // MARK: Connection Testing
@@ -254,18 +257,8 @@ final class DestinationManager {
         lastTestResult = nil
 
         do {
-            var success = false
-            switch config.destinationType {
-            case .homeAssistant:
-                let destination = try HomeAssistantDestination(
-                    config: config,
-                    networkService: networkService
-                )
-                success = try await destination.testConnection()
-            case .s3:
-                let destination = try S3Destination(config: config)
-                success = try await destination.testConnection()
-            }
+            let destination = try makeDestination(for: config)
+            let success = try await destination.testConnection()
             lastTestResult = success ? .success : .failure("Connection test returned false.")
         } catch {
             lastTestResult = .failure(error.localizedDescription)

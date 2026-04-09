@@ -25,8 +25,15 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSHealthShareUsageDescription</key>
 	<string>HealthPush reads health data you select — including activity (steps, energy, distance, exercise), body measurements (weight, BMI, body fat), vitals (heart rate, blood pressure, blood oxygen, respiratory rate, temperature), sleep analysis, and nutrition (dietary energy, water intake) — to export it to destinations you configure, such as your own S3-compatible storage or Home Assistant instance. You choose which metrics to share on a per-destination basis. Data is sent directly from your device to your destinations. HealthPush has no backend servers, never collects your health data, and never shares it with third parties.</string>
 	<key>UIApplicationSceneManifest</key>

@@ -65,16 +65,17 @@ struct SyncRecordTests {
 // MARK: - DestinationConfigTests
 
 struct DestinationConfigTests {
-    @Test("Creates a destination config with default values")
+    @Test("Creates a Home Assistant destination config with default values")
     func defaultInit() {
-        let config = DestinationConfig()
+        let config = DestinationConfig(
+            typeConfig: .homeAssistant(HomeAssistantTypeConfig(webhookURL: ""))
+        )
 
         #expect(config.name == "Home Assistant")
         #expect(config.destinationType == .homeAssistant)
         #expect(config.isEnabled)
-        #expect(config.baseURL.isEmpty)
-        #expect(config.apiToken.isEmpty)
         #expect(config.enabledMetrics == Set(HealthMetricType.allCases))
+        #expect(config.credentialKeys.isEmpty)
     }
 
     @Test("Creates a destination config with custom values")
@@ -83,20 +84,21 @@ struct DestinationConfigTests {
         let config = DestinationConfig(
             name: "My HA",
             destinationType: .homeAssistant,
-            baseURL: "http://ha.local:8123",
-            apiToken: "abc123",
+            typeConfig: .homeAssistant(HomeAssistantTypeConfig(webhookURL: "http://ha.local:8123")),
             enabledMetrics: metrics
         )
 
         #expect(config.name == "My HA")
-        #expect(config.baseURL == "http://ha.local:8123")
-        #expect(config.apiToken == "abc123")
+        let haConfig = try? config.homeAssistantConfig
+        #expect(haConfig?.webhookURL == "http://ha.local:8123")
         #expect(config.enabledMetrics == metrics)
     }
 
     @Test("Enabled metrics round-trip through raw values")
     func metricsRoundTrip() {
-        let config = DestinationConfig()
+        let config = DestinationConfig(
+            typeConfig: .homeAssistant(HomeAssistantTypeConfig(webhookURL: ""))
+        )
         let testMetrics: Set<HealthMetricType> = [.steps, .heartRate, .sleepAnalysis]
         config.enabledMetrics = testMetrics
         #expect(config.enabledMetrics == testMetrics)
@@ -104,55 +106,84 @@ struct DestinationConfigTests {
 
     @Test("Destination type round-trip through raw value")
     func typeRoundTrip() {
-        let config = DestinationConfig()
+        let config = DestinationConfig(
+            typeConfig: .homeAssistant(HomeAssistantTypeConfig(webhookURL: ""))
+        )
         config.destinationType = .homeAssistant
         #expect(config.destinationType == .homeAssistant)
         #expect(config.typeRaw == "Home Assistant")
     }
 
-    @Test("Credentials migrate to Keychain-backed storage")
-    func keychainMigration() throws {
+    @Test("Credentials stored via setCredential and retrieved via credential(for:)")
+    func keychainCredentials() throws {
         let config = DestinationConfig(
             name: "Secure Destination",
             destinationType: .s3,
-            baseURL: "healthpush-test",
-            apiToken: "AKIA_TEST",
-            enabledMetrics: [.steps],
-            s3Region: "eu-west-2",
-            s3SecretAccessKey: "SECRET_TEST",
-            s3Endpoint: "https://s3.example.com"
+            typeConfig: .s3(S3TypeConfig(
+                bucket: "healthpush-test",
+                region: "eu-west-2",
+                endpoint: "https://s3.example.com",
+                pathPrefix: "",
+                exportFormatRaw: "json",
+                syncStartDateOptionRaw: "last7Days",
+                syncStartDateCustom: nil
+            )),
+            enabledMetrics: [.steps]
         )
 
         defer {
-            try? config.deleteStoredSecrets()
+            try? config.deleteAllCredentials()
         }
 
-        try config.secureStoredSecretsIfNeeded()
+        try config.setCredential("AKIAIOSFODNN7EXAMPLE", for: CredentialField.accessKeyID)
+        try config.setCredential("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", for: CredentialField.secretAccessKey)
 
-        #expect(config.apiToken.isEmpty)
-        #expect(config.s3SecretAccessKey.isEmpty)
-        #expect((try? config.hasStoredAPIToken) == true)
-        #expect((try? config.hasStoredS3SecretAccessKey) == true)
-        #expect(try config.resolvedAPIToken == "AKIA_TEST")
-        #expect(try config.resolvedS3SecretAccessKey == "SECRET_TEST")
-        #expect(config.s3Endpoint == "https://s3.example.com")
+        #expect(config.credentialKeys[CredentialField.accessKeyID] != nil)
+        #expect(config.credentialKeys[CredentialField.secretAccessKey] != nil)
+        #expect(try config.credential(for: CredentialField.accessKeyID) == "AKIAIOSFODNN7EXAMPLE")
+        #expect(try config.credential(for: CredentialField.secretAccessKey) == "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
+
+        let s3Config = try config.s3Config
+        #expect(s3Config.endpoint == "https://s3.example.com")
     }
 
-    @Test("Stored API token can be removed independently")
-    func deleteStoredAPIToken() throws {
+    @Test("Stored credential can be removed independently")
+    func deleteStoredCredential() throws {
         let config = DestinationConfig(
             name: "Secure Destination",
             destinationType: .homeAssistant,
-            baseURL: "https://example.com",
-            apiToken: "secret"
+            typeConfig: .homeAssistant(HomeAssistantTypeConfig(webhookURL: "https://example.com"))
         )
 
-        try config.secureStoredSecretsIfNeeded()
-        try config.deleteStoredAPIToken()
+        try config.setCredential("secret", for: CredentialField.webhookSecret)
+        #expect(config.credentialKeys[CredentialField.webhookSecret] != nil)
 
-        #expect(config.apiToken.isEmpty)
-        #expect(config.apiTokenKeychainKey == nil)
-        #expect((try? config.hasStoredAPIToken) == false)
+        try config.deleteCredential(for: CredentialField.webhookSecret)
+        #expect(config.credentialKeys[CredentialField.webhookSecret] == nil)
+        #expect(try config.credential(for: CredentialField.webhookSecret) == "")
+    }
+
+    @Test("TypeSpecificConfig round-trips through JSON encoding")
+    func typeConfigRoundTrip() throws {
+        let haConfig = TypeSpecificConfig.homeAssistant(
+            HomeAssistantTypeConfig(webhookURL: "http://ha.local:8123")
+        )
+        let encoded = try JSONEncoder().encode(haConfig)
+        let decoded = try JSONDecoder().decode(TypeSpecificConfig.self, from: encoded)
+        #expect(decoded == haConfig)
+
+        let s3Config = TypeSpecificConfig.s3(S3TypeConfig(
+            bucket: "test-bucket",
+            region: "us-west-2",
+            endpoint: "",
+            pathPrefix: "health",
+            exportFormatRaw: "csv",
+            syncStartDateOptionRaw: "last30Days",
+            syncStartDateCustom: nil
+        ))
+        let s3Encoded = try JSONEncoder().encode(s3Config)
+        let s3Decoded = try JSONDecoder().decode(TypeSpecificConfig.self, from: s3Encoded)
+        #expect(s3Decoded == s3Config)
     }
 }
 

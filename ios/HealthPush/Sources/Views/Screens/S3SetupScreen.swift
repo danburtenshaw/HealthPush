@@ -132,7 +132,7 @@ struct S3SetupScreen: View {
         } header: {
             Text("Connection")
         } footer: {
-            if let error = HealthDataExporter.validateBucketName(bucketName), !bucketName.isEmpty {
+            if let error = S3TypeConfig.validateBucketName(bucketName), !bucketName.isEmpty {
                 Text(error)
                     .foregroundStyle(.red)
             } else if let error = endpointValidationError {
@@ -198,7 +198,7 @@ struct S3SetupScreen: View {
         } header: {
             Text("Storage")
         } footer: {
-            if let error = HealthDataExporter.validatePathPrefix(pathPrefix) {
+            if let error = S3TypeConfig.validatePathPrefix(pathPrefix) {
                 Text(error)
                     .foregroundStyle(.red)
             } else {
@@ -364,13 +364,13 @@ struct S3SetupScreen: View {
 
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
-            && HealthDataExporter.validateBucketName(bucketName) == nil
+            && S3TypeConfig.validateBucketName(bucketName) == nil
             && !bucketName.isEmpty
             && endpointValidationError == nil
             && !trimmedRegion.isEmpty
             && hasValidAccessKeyID
             && hasValidSecretAccessKey
-            && HealthDataExporter.validatePathPrefix(pathPrefix) == nil
+            && S3TypeConfig.validatePathPrefix(pathPrefix) == nil
             && !enabledMetrics.isEmpty
     }
 
@@ -385,19 +385,21 @@ struct S3SetupScreen: View {
     private func loadExistingConfig() {
         guard case let .edit(config) = mode else { return }
         name = config.name
-        bucketName = config.baseURL
-        region = config.s3Region.isEmpty ? "us-east-1" : config.s3Region
-        customEndpoint = config.s3Endpoint
+        if let s3Config = try? config.s3Config {
+            bucketName = s3Config.bucket
+            region = s3Config.region.isEmpty ? "us-east-1" : s3Config.region
+            customEndpoint = s3Config.endpoint
+            pathPrefix = s3Config.pathPrefix
+            exportFormat = s3Config.exportFormat
+            syncStartDateOption = s3Config.syncStartDateOption
+            syncStartDateCustom = s3Config.syncStartDateCustom ?? Date.now.daysAgo(7)
+        }
         accessKeyID = ""
         secretAccessKey = ""
-        hasStoredAccessKeyID = (try? config.hasStoredAPIToken) ?? !config.apiToken.isEmpty
-        hasStoredSecretAccessKey = (try? config.hasStoredS3SecretAccessKey) ?? !config.s3SecretAccessKey.isEmpty
-        pathPrefix = config.s3PathPrefix
-        exportFormat = config.exportFormat
+        hasStoredAccessKeyID = config.credentialKeys[CredentialField.accessKeyID] != nil
+        hasStoredSecretAccessKey = config.credentialKeys[CredentialField.secretAccessKey] != nil
         enabledMetrics = config.enabledMetrics
         syncFrequency = config.syncFrequency
-        syncStartDateOption = config.syncStartDateOption
-        syncStartDateCustom = config.syncStartDateCustom ?? Date.now.daysAgo(7)
         isEnabled = config.isEnabled
     }
 
@@ -415,42 +417,52 @@ struct S3SetupScreen: View {
         do {
             switch mode {
             case .create:
-                _ = try destinationManager.createS3Destination(
-                    name: trimmedName,
+                let typeConfig = TypeSpecificConfig.s3(S3TypeConfig(
                     bucket: trimmedBucket,
                     region: trimmedRegion,
                     endpoint: normalizedEndpoint,
-                    accessKeyID: trimmedAccessKey,
-                    secretAccessKey: trimmedSecretKey,
                     pathPrefix: trimmedPrefix,
-                    exportFormat: exportFormat,
+                    exportFormatRaw: exportFormat.rawValue,
+                    syncStartDateOptionRaw: syncStartDateOption.rawValue,
+                    syncStartDateCustom: syncStartDateOption == .custom ? syncStartDateCustom : nil
+                ))
+                let credentials: [String: String] = [
+                    CredentialField.accessKeyID: trimmedAccessKey,
+                    CredentialField.secretAccessKey: trimmedSecretKey
+                ]
+                _ = try destinationManager.createDestination(
+                    name: trimmedName,
+                    type: .s3,
+                    typeConfig: typeConfig,
+                    credentials: credentials,
                     enabledMetrics: enabledMetrics,
                     syncFrequency: syncFrequency,
-                    syncStartDateOption: syncStartDateOption,
-                    syncStartDateCustom: syncStartDateOption == .custom ? syncStartDateCustom : nil,
                     modelContext: modelContext
                 )
 
             case let .edit(config):
-                let startDateChanged = config.syncStartDateOption != syncStartDateOption
-                    || (syncStartDateOption == .custom && config.syncStartDateCustom != syncStartDateCustom)
+                let currentS3Config = try? config.s3Config
+                let startDateChanged = currentS3Config?.syncStartDateOption != syncStartDateOption
+                    || (syncStartDateOption == .custom && currentS3Config?.syncStartDateCustom != syncStartDateCustom)
 
                 config.name = trimmedName
-                config.baseURL = trimmedBucket
-                config.s3Region = trimmedRegion
-                config.s3Endpoint = normalizedEndpoint
+                try config.setTypeConfig(.s3(S3TypeConfig(
+                    bucket: trimmedBucket,
+                    region: trimmedRegion,
+                    endpoint: normalizedEndpoint,
+                    pathPrefix: trimmedPrefix,
+                    exportFormatRaw: exportFormat.rawValue,
+                    syncStartDateOptionRaw: syncStartDateOption.rawValue,
+                    syncStartDateCustom: syncStartDateOption == .custom ? syncStartDateCustom : nil
+                )))
                 if !trimmedAccessKey.isEmpty {
-                    config.apiToken = trimmedAccessKey
+                    try config.setCredential(trimmedAccessKey, for: CredentialField.accessKeyID)
                 }
                 if !trimmedSecretKey.isEmpty {
-                    config.s3SecretAccessKey = trimmedSecretKey
+                    try config.setCredential(trimmedSecretKey, for: CredentialField.secretAccessKey)
                 }
-                config.s3PathPrefix = trimmedPrefix
-                config.s3ExportFormatRaw = exportFormat.rawValue
                 config.enabledMetrics = enabledMetrics
                 config.syncFrequency = syncFrequency
-                config.syncStartDateOption = syncStartDateOption
-                config.syncStartDateCustom = syncStartDateOption == .custom ? syncStartDateCustom : nil
                 config.isEnabled = isEnabled
 
                 if startDateChanged {
@@ -494,7 +506,7 @@ struct S3SetupScreen: View {
         let effectiveAccessKeyID: String = if !accessKeyID.trimmingCharacters(in: .whitespaces).isEmpty {
             accessKeyID.trimmingCharacters(in: .whitespaces)
         } else if case let .edit(config) = mode {
-            (try? config.resolvedAPIToken) ?? ""
+            (try? config.credential(for: CredentialField.accessKeyID)) ?? ""
         } else {
             ""
         }
@@ -502,7 +514,7 @@ struct S3SetupScreen: View {
         let effectiveSecretAccessKey: String = if !secretAccessKey.trimmingCharacters(in: .whitespaces).isEmpty {
             secretAccessKey.trimmingCharacters(in: .whitespaces)
         } else if case let .edit(config) = mode {
-            (try? config.resolvedS3SecretAccessKey) ?? ""
+            (try? config.credential(for: CredentialField.secretAccessKey)) ?? ""
         } else {
             ""
         }
@@ -605,5 +617,6 @@ private enum S3TestResult {
     S3SetupScreen(mode: .create)
         .environment(DestinationManager())
         .environment(AppState())
+        .environment(SyncEngine())
         .modelContainer(for: [DestinationConfig.self], inMemory: true)
 }

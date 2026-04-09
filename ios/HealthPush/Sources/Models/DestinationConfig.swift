@@ -27,12 +27,29 @@ enum DestinationType: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - DestinationConfigError
+
+enum DestinationConfigError: LocalizedError {
+    case typeMismatch(expected: DestinationType, actual: DestinationType)
+    case corruptTypeConfig
+
+    var errorDescription: String? {
+        switch self {
+        case let .typeMismatch(expected, actual):
+            "Expected \(expected.displayName) config but found \(actual.displayName)."
+        case .corruptTypeConfig:
+            "Destination configuration data is corrupt."
+        }
+    }
+}
+
 // MARK: - DestinationConfig
 
 /// Persistent configuration for a sync destination, stored via SwiftData.
 ///
 /// Each configured destination (e.g., a Home Assistant instance) gets
-/// one of these records.
+/// one of these records. Secrets are stored in Keychain; only reference
+/// keys are persisted here via `credentialKeys`.
 @Model
 final class DestinationConfig {
     /// Unique identifier for this destination configuration.
@@ -47,14 +64,12 @@ final class DestinationConfig {
     /// Whether this destination is enabled for syncing.
     var isEnabled: Bool
 
-    /// The base URL for the destination (e.g., Home Assistant URL).
-    var baseURL: String
+    /// JSON-encoded ``TypeSpecificConfig`` blob.
+    var typeConfigData: Data
 
-    /// Authentication token or API key.
-    var apiToken: String
-
-    /// Keychain entry name for the destination API token.
-    var apiTokenKeychainKey: String?
+    /// Maps credential field names to their Keychain keys.
+    /// e.g. `["webhookSecret": "destination.<uuid>.webhookSecret"]`
+    var credentialKeys: [String: String]
 
     /// The raw values of the enabled health metric types.
     var enabledMetricRawValues: [String]
@@ -68,34 +83,8 @@ final class DestinationConfig {
     /// When this destination was last successfully synced.
     var lastSyncedAt: Date?
 
-    // MARK: S3-Specific Fields
-
-    /// AWS region for S3 destinations (e.g. "us-east-1").
-    var s3Region = ""
-
-    /// AWS secret access key for S3 destinations.
-    var s3SecretAccessKey = ""
-
-    /// Keychain entry name for the S3 secret access key.
-    var s3SecretAccessKeyKeychainKey: String?
-
-    /// Path prefix within the S3 bucket (e.g. "health/data").
-    var s3PathPrefix = ""
-
-    /// Optional custom endpoint for S3-compatible storage.
-    var s3Endpoint = ""
-
-    /// Raw value of the export format for S3 destinations.
-    var s3ExportFormatRaw = "json"
-
     /// Raw value of the sync frequency for this destination (e.g. "1hr").
     var syncFrequencyRaw = "1hr"
-
-    /// Raw value of the sync start date option (e.g. "last7Days").
-    var syncStartDateOptionRaw = "last7Days"
-
-    /// Custom start date for syncing (only used when syncStartDateOptionRaw == "custom").
-    var syncStartDateCustom: Date?
 
     /// Whether this destination needs a full (non-incremental) sync.
     /// True on creation and when sync start date changes.
@@ -119,12 +108,6 @@ final class DestinationConfig {
         }
     }
 
-    /// The export format for S3 destinations.
-    var exportFormat: ExportFormat {
-        get { ExportFormat(rawValue: s3ExportFormatRaw) ?? .json }
-        set { s3ExportFormatRaw = newValue.rawValue }
-    }
-
     /// The sync frequency for this destination.
     var syncFrequency: SyncFrequency {
         get { SyncFrequency(rawValue: syncFrequencyRaw) ?? .oneHour }
@@ -137,149 +120,97 @@ final class DestinationConfig {
         return lastSynced.addingTimeInterval(syncFrequency.timeInterval)
     }
 
-    /// The sync start date option.
-    var syncStartDateOption: SyncStartDateOption {
-        get { SyncStartDateOption(rawValue: syncStartDateOptionRaw) ?? .last7Days }
-        set { syncStartDateOptionRaw = newValue.rawValue }
-    }
-
-    /// The resolved start date for the full sync window.
-    var resolvedSyncStartDate: Date {
-        syncStartDateOption.resolvedDate(customDate: syncStartDateCustom)
-    }
-
-    /// The resolved API token, preferring Keychain-backed storage.
-    var resolvedAPIToken: String {
+    /// Decoded type-specific configuration.
+    var typeConfig: TypeSpecificConfig {
         get throws {
-            try apiTokenValue(migratingIfNeeded: true)
+            try JSONDecoder().decode(TypeSpecificConfig.self, from: typeConfigData)
         }
     }
 
-    /// The resolved S3 secret access key, preferring Keychain-backed storage.
-    var resolvedS3SecretAccessKey: String {
+    /// Sets the type-specific configuration by encoding it to JSON.
+    func setTypeConfig(_ config: TypeSpecificConfig) throws {
+        typeConfigData = try JSONEncoder().encode(config)
+    }
+
+    /// Returns the Home Assistant-specific config, or throws if this isn't an HA destination.
+    var homeAssistantConfig: HomeAssistantTypeConfig {
         get throws {
-            try s3SecretAccessKeyValue(migratingIfNeeded: true)
+            guard destinationType == .homeAssistant else {
+                throw DestinationConfigError.typeMismatch(expected: .homeAssistant, actual: destinationType)
+            }
+            let config = try typeConfig
+            guard case let .homeAssistant(haConfig) = config else {
+                throw DestinationConfigError.corruptTypeConfig
+            }
+            return haConfig
         }
     }
 
-    /// Whether an API token is stored for this destination.
-    var hasStoredAPIToken: Bool {
+    /// Returns the S3-specific config, or throws if this isn't an S3 destination.
+    var s3Config: S3TypeConfig {
         get throws {
-            try !resolvedAPIToken.isEmpty
+            guard destinationType == .s3 else {
+                throw DestinationConfigError.typeMismatch(expected: .s3, actual: destinationType)
+            }
+            let config = try typeConfig
+            guard case let .s3(s3Config) = config else {
+                throw DestinationConfigError.corruptTypeConfig
+            }
+            return s3Config
         }
     }
 
-    /// Whether an S3 secret access key is stored for this destination.
-    var hasStoredS3SecretAccessKey: Bool {
-        get throws {
-            try !resolvedS3SecretAccessKey.isEmpty
-        }
-    }
+    // MARK: Initialization
 
-    /// Creates a new destination configuration.
-    /// - Parameters:
-    ///   - name: Display name for the destination.
-    ///   - destinationType: The type of destination.
-    ///   - baseURL: The URL for the destination API.
-    ///   - apiToken: Authentication token.
-    ///   - enabledMetrics: Which health metrics to sync.
     init(
         name: String = "Home Assistant",
         destinationType: DestinationType = .homeAssistant,
-        baseURL: String = "",
-        apiToken: String = "",
-        enabledMetrics: Set<HealthMetricType> = Set(HealthMetricType.allCases),
-        s3Region: String = "",
-        s3SecretAccessKey: String = "",
-        s3PathPrefix: String = "",
-        s3Endpoint: String = "",
-        s3ExportFormat: ExportFormat = .json
+        typeConfig: TypeSpecificConfig,
+        enabledMetrics: Set<HealthMetricType> = Set(HealthMetricType.allCases)
     ) {
         id = UUID()
         self.name = name
         typeRaw = destinationType.rawValue
         isEnabled = true
-        self.baseURL = baseURL
-        self.apiToken = apiToken
-        apiTokenKeychainKey = nil
+        // Force-unwrap is safe: TypeSpecificConfig is a known enum with Codable conformance.
+        // swiftlint:disable:next force_try
+        typeConfigData = try! JSONEncoder().encode(typeConfig)
+        credentialKeys = [:]
         enabledMetricRawValues = enabledMetrics.map(\.rawValue)
         createdAt = .now
         modifiedAt = .now
-        self.s3Region = s3Region
-        self.s3SecretAccessKey = s3SecretAccessKey
-        s3SecretAccessKeyKeychainKey = nil
-        self.s3PathPrefix = s3PathPrefix
-        self.s3Endpoint = s3Endpoint
-        s3ExportFormatRaw = s3ExportFormat.rawValue
     }
 
-    // MARK: Secret Storage
+    // MARK: Credential Management
 
-    func secureStoredSecretsIfNeeded() throws {
-        if !apiToken.isEmpty {
-            let key = apiTokenKeychainKey
-                ?? KeychainService.destinationSecretKey(destinationID: id, field: "api_token")
-            try KeychainService.save(apiToken, for: key)
-            apiTokenKeychainKey = key
-            apiToken = ""
+    /// Loads a credential from the Keychain by its field name.
+    func credential(for field: String) throws -> String {
+        guard let keychainKey = credentialKeys[field] else {
+            return ""
         }
-
-        if !s3SecretAccessKey.isEmpty {
-            let key = s3SecretAccessKeyKeychainKey
-                ?? KeychainService.destinationSecretKey(destinationID: id, field: "s3_secret_access_key")
-            try KeychainService.save(s3SecretAccessKey, for: key)
-            s3SecretAccessKeyKeychainKey = key
-            s3SecretAccessKey = ""
-        }
+        return try KeychainService.load(keychainKey) ?? ""
     }
 
-    func deleteStoredSecrets() throws {
-        if let apiTokenKeychainKey {
-            try KeychainService.delete(apiTokenKeychainKey)
-            self.apiTokenKeychainKey = nil
-        }
-
-        if let s3SecretAccessKeyKeychainKey {
-            try KeychainService.delete(s3SecretAccessKeyKeychainKey)
-            self.s3SecretAccessKeyKeychainKey = nil
-        }
+    /// Stores a credential in the Keychain and records its reference key.
+    func setCredential(_ value: String, for field: String) throws {
+        let keychainKey = credentialKeys[field]
+            ?? KeychainService.destinationSecretKey(destinationID: id, field: field)
+        try KeychainService.save(value, for: keychainKey)
+        credentialKeys[field] = keychainKey
     }
 
-    func deleteStoredAPIToken() throws {
-        if let apiTokenKeychainKey {
-            try KeychainService.delete(apiTokenKeychainKey)
-            self.apiTokenKeychainKey = nil
-        }
-        apiToken = ""
+    /// Deletes a single credential from the Keychain and removes its reference.
+    func deleteCredential(for field: String) throws {
+        guard let keychainKey = credentialKeys[field] else { return }
+        try KeychainService.delete(keychainKey)
+        credentialKeys.removeValue(forKey: field)
     }
 
-    func deleteStoredS3SecretAccessKey() throws {
-        if let s3SecretAccessKeyKeychainKey {
-            try KeychainService.delete(s3SecretAccessKeyKeychainKey)
-            self.s3SecretAccessKeyKeychainKey = nil
+    /// Deletes all credentials from the Keychain and clears all references.
+    func deleteAllCredentials() throws {
+        for (_, keychainKey) in credentialKeys {
+            try KeychainService.delete(keychainKey)
         }
-        s3SecretAccessKey = ""
-    }
-
-    func apiTokenValue(migratingIfNeeded shouldMigrate: Bool) throws -> String {
-        if let apiTokenKeychainKey {
-            return try KeychainService.load(apiTokenKeychainKey) ?? ""
-        }
-        if shouldMigrate, !apiToken.isEmpty {
-            try secureStoredSecretsIfNeeded()
-            return try apiTokenValue(migratingIfNeeded: false)
-        }
-        return apiToken
-    }
-
-    func s3SecretAccessKeyValue(migratingIfNeeded shouldMigrate: Bool) throws -> String {
-        if let s3SecretAccessKeyKeychainKey {
-            return try KeychainService.load(s3SecretAccessKeyKeychainKey) ?? ""
-        }
-        if shouldMigrate, !s3SecretAccessKey.isEmpty {
-            try secureStoredSecretsIfNeeded()
-            return try s3SecretAccessKeyValue(migratingIfNeeded: false)
-        }
-        return s3SecretAccessKey
+        credentialKeys.removeAll()
     }
 }

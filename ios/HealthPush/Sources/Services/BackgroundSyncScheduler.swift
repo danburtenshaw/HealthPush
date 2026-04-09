@@ -10,7 +10,7 @@ import os
 /// - `BGAppRefreshTask`: lightweight sync for frequent updates.
 /// - `BGProcessingTask`: heavier sync for larger data transfers.
 @MainActor
-final class BackgroundSyncScheduler: Sendable {
+final class BackgroundSyncScheduler {
     // MARK: Constants
 
     static let refreshTaskIdentifier = "app.healthpush.sync.refresh"
@@ -26,11 +26,9 @@ final class BackgroundSyncScheduler: Sendable {
     /// Debounce task for observer-triggered syncs.
     private var pendingObserverSync: Task<Void, Never>?
 
-    /// Whether a sync is currently in progress. Prevents concurrent syncs
-    /// from racing on destination resources (e.g., S3 read-modify-write).
-    /// Shared across foreground and background sync paths so that manual
-    /// "Sync Now" and observer-triggered syncs don't create duplicate records.
-    private(set) var isSyncing = false
+    /// Observable application state — the single source of truth for `isSyncing`.
+    /// Set via ``configure(appState:)`` before the first sync.
+    private var appState: AppState?
 
     /// The last frequency used to schedule tasks. Used by task handlers to
     /// re-schedule with the correct interval (instead of reading a stale global default).
@@ -41,6 +39,21 @@ final class BackgroundSyncScheduler: Sendable {
     static let shared = BackgroundSyncScheduler()
 
     private init() { }
+
+    // MARK: Configuration
+
+    /// Provides the shared `AppState` so the scheduler can use its `isSyncing` flag
+    /// as the single source of truth for sync-in-progress gating.
+    /// - Parameter appState: The application-wide observable state.
+    func configure(appState: AppState) {
+        self.appState = appState
+    }
+
+    /// Whether a sync is currently in progress, delegated to ``AppState/isSyncing``.
+    private var isSyncing: Bool {
+        get { appState?.isSyncing ?? false }
+        set { appState?.isSyncing = newValue }
+    }
 
     // MARK: Registration
 
@@ -116,13 +129,6 @@ final class BackgroundSyncScheduler: Sendable {
     func cancelAllTasks() {
         BGTaskScheduler.shared.cancelAllTaskRequests()
         logger.info("All background tasks cancelled")
-    }
-
-    /// Marks a foreground (manual) sync as in progress, preventing observer-triggered
-    /// and background syncs from racing. Call with `true` before starting a foreground
-    /// sync and `false` when it finishes.
-    func setForegroundSyncing(_ syncing: Bool) {
-        isSyncing = syncing
     }
 
     // MARK: Observer Handling
