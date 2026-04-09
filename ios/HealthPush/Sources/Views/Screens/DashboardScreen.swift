@@ -30,13 +30,16 @@ struct DashboardScreen: View {
     @State private var showingAddHA = false
     @State private var showingAddS3 = false
     @State private var selectedConfig: DestinationConfig?
+    @State private var lastSyncSucceeded = false
+    @State private var nudgeDismissed = false
+    @State private var showSyncSuccess = false
 
     // MARK: Body
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: HP.Spacing.xxl) {
                     if destinationManager.destinations.isEmpty {
                         // No destinations — guide the user to set one up
                         emptyDestinationsPrompt
@@ -52,24 +55,23 @@ struct DashboardScreen: View {
                             hasSyncIssues: latestIssueRecord != nil
                         )
 
-                        if showSetupChecklist {
-                            setupChecklistCard
+                        // Single prioritized nudge slot replaces individual banners
+                        if let nudge = activeNudge, !nudgeDismissed {
+                            NudgeRow(
+                                kind: nudge,
+                                onAction: { handleNudgeAction(nudge) },
+                                onSecondaryAction: { showingSyncHistory = true },
+                                onDismiss: {
+                                    withAnimation(.easeOut(duration: 0.25)) {
+                                        nudgeDismissed = true
+                                    }
+                                }
+                            )
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .top).combined(with: .opacity),
+                                removal: .opacity
+                            ))
                         }
-
-                        if !appState.isBackgroundRefreshAvailable {
-                            backgroundRefreshWarning
-                        }
-
-                        if appState.lastSyncHadNoData && !appState.isSyncing {
-                            noDataWarning
-                        }
-
-                        if let latestIssueRecord, !appState.isSyncing {
-                            syncIssueCard(record: latestIssueRecord)
-                        }
-
-                        // Sync Now button
-                        syncNowButton
 
                         // Destinations section
                         destinationsSection
@@ -78,12 +80,18 @@ struct DashboardScreen: View {
                         if !recentSyncs.isEmpty {
                             recentActivitySection
                         }
+
+                        // Trust footer
+                        trustFooter
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 32)
+                .padding(.top, HP.Spacing.md)
+                .padding(.bottom, HP.Spacing.jumbo)
             }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
+            .contentMargins(.horizontal, HP.Spacing.xxl, for: .scrollContent)
+            .sensoryFeedback(.success, trigger: lastSyncSucceeded)
             .background(Color(.systemGroupedBackground))
             .navigationTitle("HealthPush")
             .toolbar {
@@ -125,48 +133,161 @@ struct DashboardScreen: View {
                     HomeAssistantSetupScreen(mode: .edit(config))
                 }
             }
+            .safeAreaInset(edge: .bottom) {
+                if !destinationManager.destinations.isEmpty {
+                    syncBottomBar
+                }
+            }
             .refreshable {
                 await performSync()
+            }
+            .onChange(of: activeNudge) {
+                // Reset dismissal when the nudge kind changes
+                nudgeDismissed = false
+            }
+        }
+    }
+
+    // MARK: Nudge Logic
+
+    /// The highest-priority nudge that applies right now, or nil.
+    private var activeNudge: NudgeKind? {
+        // Don't show nudges while syncing
+        guard !appState.isSyncing else { return nil }
+
+        // Priority 1: Sync failure
+        if let record = latestIssueRecord {
+            return .syncFailure(
+                message: record.errorMessage
+                    ?? "One or more destinations reported an error during the last sync.",
+                recovery: record.failureCategory?.recoveryAction
+            )
+        }
+
+        // Priority 2: No health data
+        if appState.lastSyncHadNoData {
+            return .noHealthData
+        }
+
+        // Priority 3: Background refresh disabled
+        if !appState.isBackgroundRefreshAvailable {
+            return .backgroundRefreshDisabled
+        }
+
+        // Priority 4: Setup incomplete
+        if !appState.healthKitAuthorized || hasNeverSyncedDestination {
+            return .setupIncomplete(
+                healthKitAuthorized: appState.healthKitAuthorized,
+                hasDestinations: !destinationManager.destinations.isEmpty,
+                hasEverSynced: !hasNeverSyncedDestination
+            )
+        }
+
+        return nil
+    }
+
+    private func handleNudgeAction(_ nudge: NudgeKind) {
+        switch nudge {
+        case let .syncFailure(_, recovery):
+            if recovery != nil, let record = latestIssueRecord {
+                navigateToRecovery(record: record)
+            } else if let preferred = destinationManager.destinations.first(where: \.isEnabled) {
+                selectedConfig = preferred
+            }
+        case .noHealthData:
+            if let url = URL(string: "x-apple-health://") {
+                UIApplication.shared.open(url)
+            }
+        case .backgroundRefreshDisabled:
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(url)
+            }
+        case let .setupIncomplete(healthKitAuthorized, hasDestinations, _):
+            if !hasDestinations {
+                showingDestinationPicker = true
+            } else if !healthKitAuthorized {
+                if let url = URL(string: "x-apple-health://") {
+                    UIApplication.shared.open(url)
+                }
             }
         }
     }
 
     // MARK: Subviews
 
-    private var syncNowButton: some View {
-        Button {
-            Task {
-                await performSync()
-            }
-        } label: {
-            HStack(spacing: 10) {
-                if appState.isSyncing {
-                    ProgressView()
-                        .tint(.white)
-                } else {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.body.weight(.semibold))
+    private var syncBottomBar: some View {
+        Group {
+            if showSyncSuccess {
+                // Brief success indicator
+                HStack(spacing: HP.Spacing.md) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.white)
+                        .symbolRenderingMode(.hierarchical)
+                    Text("Sync Complete")
+                        .font(HP.Typography.sectionTitle)
+                        .foregroundStyle(.white)
                 }
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 52)
+                .background(Color.green, in: RoundedRectangle(cornerRadius: HP.Radius.card, style: .continuous))
+            } else if appState.isSyncing {
+                // Syncing state with per-destination progress
+                VStack(spacing: HP.Spacing.sm) {
+                    HStack(spacing: HP.Spacing.mdLg) {
+                        ProgressView()
+                            .tint(.white)
+                        Text("Syncing...")
+                            .font(HP.Typography.sectionTitle)
+                            .foregroundStyle(.white)
+                    }
 
-                Text(appState.isSyncing ? "Syncing..." : "Sync Now")
-                    .font(.headline)
+                    if let progressText = aggregateSyncProgressText {
+                        Text(progressText)
+                            .font(HP.Typography.caption)
+                            .foregroundStyle(.white.opacity(0.8))
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 52)
+                .background(Color.gray, in: RoundedRectangle(cornerRadius: HP.Radius.card, style: .continuous))
+            } else {
+                // Idle state
+                Button {
+                    Task {
+                        await performSync()
+                    }
+                } label: {
+                    HStack(spacing: HP.Spacing.mdLg) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.body.weight(.semibold))
+                        Text("Sync Now")
+                            .font(HP.Typography.sectionTitle)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 52)
+                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: HP.Radius.card, style: .continuous))
+                    .foregroundStyle(.white)
+                }
+                .sensoryFeedback(.impact(flexibility: .solid), trigger: appState.isSyncing)
+                .accessibilityLabel("Sync Now")
+                .accessibilityHint("Sends health data to all enabled destinations")
             }
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 52)
-            .background {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(appState.isSyncing ? Color.gray : Color.accentColor)
-            }
-            .foregroundStyle(.white)
         }
-        .disabled(appState.isSyncing)
-        .sensoryFeedback(.impact(flexibility: .solid), trigger: appState.isSyncing)
-        .accessibilityLabel(appState.isSyncing ? "Syncing in progress" : "Sync Now")
-        .accessibilityHint(appState.isSyncing ? "" : "Sends health data to all enabled destinations")
+        .padding(.horizontal, HP.Spacing.xl)
+        .padding(.vertical, HP.Spacing.md)
+        .background(.bar)
+    }
+
+    /// Aggregated progress text from all active destination syncs.
+    private var aggregateSyncProgressText: String? {
+        let entries = appState.syncStatusText.sorted(by: { $0.key < $1.key })
+        guard !entries.isEmpty else { return nil }
+        return entries.map { "\($0.key): \($0.value)" }.joined(separator: " | ")
     }
 
     private var destinationsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: HP.Spacing.lg) {
             HStack {
                 Text("Destinations")
                     .font(.title3.weight(.semibold))
@@ -180,27 +301,32 @@ struct DashboardScreen: View {
             }
 
             ForEach(destinationManager.destinations, id: \.id) { config in
-                VStack(spacing: 8) {
+                VStack(spacing: HP.Spacing.md) {
                     Button {
                         selectedConfig = config
                     } label: {
                         DestinationCard(config: config)
                     }
                     .buttonStyle(.plain)
+                    .scrollTransition { content, phase in
+                        content
+                            .opacity(phase.isIdentity ? 1 : 0.3)
+                            .scaleEffect(phase.isIdentity ? 1 : 0.95)
+                    }
                     .accessibilityHint("Double tap to edit \(config.name)")
 
                     if appState.isSyncing {
                         let progress = appState.syncProgress[config.name] ?? 0
                         let status = appState.syncStatusText[config.name] ?? "Waiting..."
 
-                        VStack(spacing: 4) {
+                        VStack(spacing: HP.Spacing.xs) {
                             ProgressView(value: progress)
                                 .tint(progress >= 1.0 ? .green : Color.accentColor)
                             Text(status)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
-                        .padding(.horizontal, 4)
+                        .padding(.horizontal, HP.Spacing.xs)
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("\(config.name) sync progress: \(status)")
                     }
@@ -210,38 +336,39 @@ struct DashboardScreen: View {
     }
 
     private var emptyDestinationsPrompt: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: HP.Spacing.xxl) {
             Spacer()
                 .frame(height: 40)
 
             Image(systemName: "heart.text.clipboard")
                 .font(.system(size: 56))
                 .foregroundStyle(Color.accentColor.opacity(0.7))
+                .symbolRenderingMode(.hierarchical)
                 .accessibilityHidden(true)
 
-            VStack(spacing: 8) {
+            VStack(spacing: HP.Spacing.md) {
                 Text("Welcome to HealthPush")
                     .font(.title2.weight(.semibold))
 
                 Text("Connect a destination to start syncing your Apple Health data.")
-                    .font(.subheadline)
+                    .font(HP.Typography.cardBody)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, HP.Spacing.xl)
             }
 
             Button {
                 showingDestinationPicker = true
             } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: HP.Spacing.mdLg) {
                     Image(systemName: "plus.circle.fill")
                     Text("Add Destination")
-                        .font(.headline)
+                        .font(HP.Typography.sectionTitle)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 52)
                 .background {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: HP.Radius.card, style: .continuous)
                         .fill(Color.accentColor)
                 }
                 .foregroundStyle(.white)
@@ -255,13 +382,16 @@ struct DashboardScreen: View {
                     .foregroundStyle(Color.accentColor)
             }
 
+            // Trust footer for empty state too
+            trustFooter
+
             Spacer()
         }
         .frame(maxWidth: .infinity)
     }
 
     private var recentActivitySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: HP.Spacing.lg) {
             HStack {
                 Text("Recent Activity")
                     .font(.title3.weight(.semibold))
@@ -274,83 +404,30 @@ struct DashboardScreen: View {
 
             ForEach(recentSyncs.prefix(3)) { record in
                 RecentSyncRow(record: record)
+                    .scrollTransition { content, phase in
+                        content
+                            .opacity(phase.isIdentity ? 1 : 0.3)
+                            .scaleEffect(phase.isIdentity ? 1 : 0.95)
+                    }
             }
         }
     }
 
-    private var backgroundRefreshWarning: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Background Sync Unavailable", systemImage: "exclamationmark.triangle.fill")
-                .font(.headline)
-                .foregroundStyle(.yellow)
+    private var trustFooter: some View {
+        VStack(spacing: HP.Spacing.sm) {
+            Text("Open source \u{00B7} No backend \u{00B7} No telemetry")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
 
-            Text("Background App Refresh is turned off or Low Power Mode is active. HealthPush can only sync while you have the app open.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Button("Open Settings") {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
+            Link(destination: URL(string: "https://github.com/danburtenshaw/HealthPush")!) {
+                Text("View on GitHub")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
-            .buttonStyle(.bordered)
-            .accessibilityHint("Opens iOS Settings to enable Background App Refresh")
+            .accessibilityLabel("View HealthPush on GitHub")
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.yellow.opacity(0.10))
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.yellow.opacity(0.25), lineWidth: 1)
-        }
-    }
-
-    private var noDataWarning: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("No Health Data Synced", systemImage: "heart.slash")
-                .font(.headline)
-                .foregroundStyle(.orange)
-
-            Text(
-                "Your first sync completed but found no health data."
-                    + " This usually means HealthPush does not have permission"
-                    + " to read the selected metrics. You can review permissions"
-                    + " in the Health app under Sharing > Apps > HealthPush."
-            )
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-
-            HStack(spacing: 12) {
-                Button("Open Health App") {
-                    if let url = URL(string: "x-apple-health://") {
-                        UIApplication.shared.open(url)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .accessibilityHint("Opens Apple Health to review data sharing permissions")
-
-                Button("Review Destinations") {
-                    if let preferred = destinationManager.destinations.first(where: \.isEnabled) {
-                        selectedConfig = preferred
-                    }
-                }
-                .buttonStyle(.bordered)
-                .accessibilityHint("Opens the first enabled destination for review")
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.orange.opacity(0.10))
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.orange.opacity(0.25), lineWidth: 1)
-        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, HP.Spacing.md)
     }
 
     // MARK: Actions
@@ -361,6 +438,7 @@ struct DashboardScreen: View {
         appState.isSyncing = true
         appState.syncProgress = [:]
         appState.syncStatusText = [:]
+        showSyncSuccess = false
         defer {
             appState.isSyncing = false
             appState.syncProgress = [:]
@@ -375,6 +453,21 @@ struct DashboardScreen: View {
             appState.syncStatusText[name] = pct < 100 ? "Syncing \(pct)%" : "Done"
         }
         appState.recordSyncResult(result)
+
+        if result.failedDestinations == 0 && result.successfulDestinations > 0 {
+            lastSyncSucceeded.toggle()
+        }
+
+        // Brief success indicator that fades after 3 seconds
+        if result.failedDestinations == 0 {
+            showSyncSuccess = true
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showSyncSuccess = false
+                }
+            }
+        }
 
         // Re-schedule background tasks with fresh earliest begin date
         let minFrequency = destinationManager.destinations
@@ -436,10 +529,6 @@ struct DashboardScreen: View {
             .contains { $0.lastSyncedAt == nil }
     }
 
-    private var showSetupChecklist: Bool {
-        !appState.healthKitAuthorized || hasNeverSyncedDestination
-    }
-
     private var latestIssueRecord: SyncRecord? {
         guard let latestRecord = allSyncs.first else { return nil }
         guard latestRecord.status == .failure || latestRecord.status == .partialFailure else {
@@ -448,136 +537,11 @@ struct DashboardScreen: View {
         return latestRecord
     }
 
-    private var setupChecklistCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Finish Setup", systemImage: "checklist")
-                .font(.headline)
-
-            checklistRow(
-                title: "Health access",
-                detail: appState
-                    .healthKitAuthorized ? "Apple Health permissions are configured." :
-                    "Grant access so HealthPush can read the metrics you select.",
-                isComplete: appState.healthKitAuthorized
-            )
-
-            checklistRow(
-                title: "First destination",
-                detail: "\(destinationManager.destinations.count) configured",
-                isComplete: !destinationManager.destinations.isEmpty
-            )
-
-            checklistRow(
-                title: "First successful sync",
-                detail: hasNeverSyncedDestination
-                    ? "Run Sync Now once your destination is configured."
-                    : "Last completed \(aggregateLastSyncFormatted).",
-                isComplete: !hasNeverSyncedDestination
-            )
-
-            HStack(spacing: 12) {
-                Button("Welcome Guide") {
-                    appState.hasSeenOnboarding = false
-                }
-                .buttonStyle(.bordered)
-
-                Button("Add Destination") {
-                    showingDestinationPicker = true
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-    }
-
-    private func syncIssueCard(record: SyncRecord) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Sync Needs Attention", systemImage: "exclamationmark.triangle.fill")
-                .font(.headline)
-                .foregroundStyle(.orange)
-
-            Text(record.errorMessage ?? "One or more destinations reported an error during the last sync.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(4)
-
-            if let failure = record.failureCategory {
-                if failure.isRetryable {
-                    Text("Will retry automatically on next sync.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if let recovery = failure.recoveryAction {
-                    Text(recovery.guidance)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.orange)
-                }
-            }
-
-            HStack(spacing: 12) {
-                Button("View History") {
-                    showingSyncHistory = true
-                }
-                .buttonStyle(.bordered)
-                .accessibilityHint("Opens sync history to review past operations")
-
-                if let recovery = record.failureCategory?.recoveryAction {
-                    Button(recovery.buttonTitle) {
-                        navigateToRecovery(record: record)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityHint("Opens the destination settings to fix the issue")
-                } else {
-                    Button("Review Destinations") {
-                        if let preferred = destinationManager.destinations.first(where: \.isEnabled) {
-                            selectedConfig = preferred
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityHint("Opens the first enabled destination for review")
-                }
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.orange.opacity(0.10))
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.orange.opacity(0.25), lineWidth: 1)
-        }
-    }
-
     private func navigateToRecovery(record: SyncRecord) {
         let matchingConfig = destinationManager.destinations.first { $0.id == record.destinationID }
         selectedConfig = matchingConfig ?? destinationManager.destinations.first(where: \.isEnabled)
     }
 
-    private func checklistRow(title: String, detail: String, isComplete: Bool) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isComplete ? .green : .secondary)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title), \(isComplete ? "complete" : "incomplete"). \(detail)")
-    }
 }
 
 // MARK: - RecentSyncRow
@@ -586,30 +550,42 @@ private struct RecentSyncRow: View {
     let record: SyncRecord
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: HP.Spacing.lg) {
             Image(systemName: statusIcon)
                 .font(.body.weight(.medium))
                 .foregroundStyle(statusColor)
+                .symbolRenderingMode(.hierarchical)
+                .symbolEffect(.pulse, isActive: record.status == .inProgress)
                 .frame(width: 28)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: HP.Spacing.xxs) {
                 Text(record.destinationName)
                     .font(.subheadline.weight(.medium))
 
                 Text("\(record.dataPointCount) data points")
-                    .font(.caption)
+                    .font(HP.Typography.caption)
                     .foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
+                    .animation(.default, value: record.dataPointCount)
             }
 
             Spacer()
 
             Text(record.timestamp, style: .relative)
-                .font(.caption)
+                .font(HP.Typography.caption)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, HP.Spacing.sm)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(record.destinationName), \(statusDescription), \(record.dataPointCount) data points")
+        .accessibilityLabel(fullAccessibilityLabel)
+    }
+
+    private var fullAccessibilityLabel: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        let absoluteDate = formatter.string(from: record.timestamp)
+        return "\(record.destinationName), \(statusDescription), \(record.dataPointCount) data points, \(absoluteDate)"
     }
 
     private var statusDescription: String {

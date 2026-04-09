@@ -13,21 +13,22 @@ struct MetricRow: View {
     // MARK: Body
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: HP.Spacing.lg) {
             // Metric icon
             ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: HP.Radius.sm, style: .continuous)
                     .fill(iconColor.opacity(0.15))
                     .frame(width: 36, height: 36)
 
                 Image(systemName: metric.symbolName)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(iconColor)
+                    .symbolRenderingMode(.hierarchical)
             }
             .accessibilityHidden(true)
 
             // Metric info
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: HP.Spacing.xxs) {
                 Text(metric.displayName)
                     .font(.subheadline.weight(.medium))
 
@@ -47,7 +48,7 @@ struct MetricRow: View {
                 .accessibilityValue(isEnabled ? "Enabled" : "Disabled")
                 .accessibilityHint(isEnabled ? "Double tap to stop syncing this metric" : "Double tap to start syncing this metric")
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, HP.Spacing.xs)
         .contentShape(Rectangle())
     }
 

@@ -67,11 +67,11 @@ struct SettingsScreen: View {
 
     private var backgroundSyncSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: HP.Spacing.lg) {
                 Label("How Background Sync Works", systemImage: "info.circle")
-                    .font(.subheadline.weight(.semibold))
+                    .font(HP.Typography.cardTitle)
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: HP.Spacing.sm) {
                     bulletRow(
                         icon: "applewatch",
                         text: "HealthKit delivery — syncs when new health data arrives from Apple Watch or other sources"
@@ -87,11 +87,11 @@ struct SettingsScreen: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: HP.Spacing.lg) {
                 Label("Tips", systemImage: "lightbulb.fill")
-                    .font(.subheadline.weight(.semibold))
+                    .font(HP.Typography.cardTitle)
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: HP.Spacing.sm) {
                     bulletRow(icon: "xmark.app", text: "Force-quitting the app disables ALL background sync until you reopen it")
                     bulletRow(icon: "battery.25percent", text: "Low Power Mode reduces background sync opportunities")
                     bulletRow(icon: "clock", text: "The sync frequency you set is a minimum interval — iOS controls exact timing")
@@ -99,9 +99,9 @@ struct SettingsScreen: View {
             }
 
             if !appState.isBackgroundRefreshAvailable {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: HP.Spacing.md) {
                     Label("Background App Refresh is Off", systemImage: "exclamationmark.triangle.fill")
-                        .font(.subheadline.weight(.semibold))
+                        .font(HP.Typography.cardTitle)
                         .foregroundStyle(.orange)
 
                     Text("Background syncs will not run. Turn on Background App Refresh in Settings, or disable Low Power Mode.")
@@ -261,7 +261,7 @@ struct SettingsScreen: View {
     // MARK: Helpers
 
     private func bulletRow(icon: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: HP.Spacing.md) {
             Image(systemName: icon)
                 .font(.caption)
                 .foregroundStyle(.secondary)

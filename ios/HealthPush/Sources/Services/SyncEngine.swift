@@ -54,6 +54,7 @@ final class SyncEngine {
     // MARK: Properties
 
     private let logger = Logger(subsystem: "app.healthpush", category: "SyncEngine")
+    private let signposter = OSSignposter(subsystem: "app.healthpush", category: "Performance")
     private var healthKitReader: (any HealthKitReading)?
     private let networkService: NetworkService
 
@@ -109,6 +110,7 @@ final class SyncEngine {
         isBackground: Bool = false,
         onProgress: ProgressHandler? = nil
     ) async -> SyncResult {
+        let syncState = signposter.beginInterval("performSync")
         let startTime = Date()
         logger.info("Starting sync (background: \(isBackground))")
 
@@ -123,6 +125,7 @@ final class SyncEngine {
               !destinations.isEmpty
         else {
             logger.warning("No enabled destinations found")
+            signposter.endInterval("performSync", syncState)
             return SyncResult(
                 dataPointCount: 0,
                 successfulDestinations: 0,
@@ -134,6 +137,7 @@ final class SyncEngine {
 
         guard let healthKitReader else {
             logger.error("HealthKit not available")
+            signposter.endInterval("performSync", syncState)
             return SyncResult(
                 dataPointCount: 0,
                 successfulDestinations: 0,
@@ -170,6 +174,8 @@ final class SyncEngine {
                 continue
             }
 
+            let destState = signposter.beginInterval("syncDestination", id: signposter.makeSignpostID(), "\(config.name)")
+
             // Create the destination via the injected factory.
             let destination: any SyncDestination
             do {
@@ -181,6 +187,7 @@ final class SyncEngine {
                     errorDescription: error.localizedDescription
                 ))
                 logger.error("Failed to create destination \(config.name): \(error.localizedDescription)")
+                signposter.endInterval("syncDestination", destState)
                 continue
             }
 
@@ -211,6 +218,8 @@ final class SyncEngine {
             successCount += result.successCount
             failCount += result.failCount
             errors.append(contentsOf: result.errors)
+
+            signposter.endInterval("syncDestination", destState)
         }
 
         // Save sync records and updated destination configs
@@ -226,6 +235,7 @@ final class SyncEngine {
         let duration = Date().timeIntervalSince(startTime)
         logger.info("Sync completed in \(String(format: "%.1f", duration))s: \(successCount) succeeded, \(failCount) failed")
 
+        signposter.endInterval("performSync", syncState)
         return SyncResult(
             dataPointCount: totalDataPoints,
             successfulDestinations: successCount,

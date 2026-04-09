@@ -81,7 +81,7 @@ struct HealthMetricsScreen: View {
                 }
             }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: HP.Spacing.md) {
                 Image(systemName: category.symbolName)
                 Text(category.rawValue)
 

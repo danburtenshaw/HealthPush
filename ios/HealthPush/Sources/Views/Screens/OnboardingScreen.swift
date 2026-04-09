@@ -15,20 +15,23 @@ struct OnboardingScreen: View {
     @State private var showingAddDestination = false
     @State private var showingSetupS3 = false
     @State private var showingSetupHomeAssistant = false
+    @State private var trustPillsAppeared = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: HP.Spacing.xxxl) {
                     heroSection
+                    dataPreviewSection
                     activationSection
                     destinationSection
                     footerActions
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 24)
-                .padding(.bottom, 32)
+                .padding(.horizontal, HP.Spacing.xxl)
+                .padding(.top, HP.Spacing.xxxl)
+                .padding(.bottom, HP.Spacing.jumbo)
             }
+            .scrollBounceBehavior(.basedOnSize)
             .background(Color(.systemGroupedBackground))
             .navigationBarBackButtonHidden()
             .toolbar {
@@ -65,14 +68,14 @@ struct OnboardingScreen: View {
     }
 
     private var heroSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: HP.Spacing.xl) {
+            VStack(alignment: .leading, spacing: HP.Spacing.lgXl) {
                 Label("HealthPush", systemImage: "heart.text.clipboard.fill")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.9))
 
                 Text("Push your Apple Health data where you control it.")
-                    .font(.system(.title, design: .rounded, weight: .bold))
+                    .font(HP.Typography.heroTitle)
                     .foregroundStyle(.white)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -83,10 +86,10 @@ struct OnboardingScreen: View {
                 .foregroundStyle(.white.opacity(0.9))
                 .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(24)
+            .padding(HP.Spacing.xxxl)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: HP.Radius.hero, style: .continuous)
                     .fill(
                         LinearGradient(
                             colors: [Color.orange.opacity(0.95), Color.red.opacity(0.8)],
@@ -97,18 +100,52 @@ struct OnboardingScreen: View {
             )
             .accessibilityElement(children: .combine)
 
-            HStack(spacing: 12) {
+            HStack(spacing: HP.Spacing.lg) {
                 trustPill("Open source", systemImage: "chevron.left.forwardslash.chevron.right")
                 trustPill("Local first", systemImage: "iphone")
                 trustPill("No telemetry", systemImage: "lock.shield")
             }
+            .symbolEffect(.bounce, value: trustPillsAppeared)
+            .onAppear { trustPillsAppeared = true }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Open source. Local first. No telemetry.")
         }
     }
 
+    private var dataPreviewSection: some View {
+        VStack(alignment: .leading, spacing: HP.Spacing.lgXl) {
+            VStack(alignment: .leading, spacing: HP.Spacing.mdLg) {
+                Label("What HealthPush reads", systemImage: "heart.text.clipboard")
+                    .font(.subheadline.weight(.semibold))
+                    .symbolRenderingMode(.hierarchical)
+
+                Text("Steps \u{00B7} Heart Rate \u{00B7} Sleep \u{00B7} Weight \u{00B7} Blood Pressure \u{00B7} and 18 more")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: HP.Spacing.mdLg) {
+                Label("What it never touches", systemImage: "hand.raised.slash")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .symbolRenderingMode(.hierarchical)
+
+                Text("Location \u{00B7} Notes \u{00B7} Photos \u{00B7} Contacts")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(HP.Spacing.xxl)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: HP.Radius.section, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("What HealthPush reads: Steps, Heart Rate, Sleep, Weight, Blood Pressure, and 18 more. What it never touches: Location, Notes, Photos, Contacts.")
+    }
+
     private var activationSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: HP.Spacing.lgXl) {
             Text("Before your first sync")
                 .font(.title3.weight(.semibold))
 
@@ -132,9 +169,9 @@ struct OnboardingScreen: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .padding(.horizontal, HP.Spacing.xl)
+                .padding(.vertical, HP.Spacing.lgXl)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: HP.Radius.sheet, style: .continuous))
             }
             .buttonStyle(.plain)
             .disabled(requestingHealthAccess)
@@ -145,7 +182,7 @@ struct OnboardingScreen: View {
     }
 
     private var destinationSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: HP.Spacing.lgXl) {
             Text("Set up a destination")
                 .font(.title3.weight(.semibold))
 
@@ -158,14 +195,14 @@ struct OnboardingScreen: View {
             Button {
                 showingAddDestination = true
             } label: {
-                HStack(spacing: 14) {
+                HStack(spacing: HP.Spacing.lgXl) {
                     Image(systemName: "plus.circle.fill")
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(Color.accentColor)
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: HP.Spacing.xxs) {
                         Text("Add Destination")
-                            .font(.headline)
+                            .font(HP.Typography.sectionTitle)
                         Text("Pick from available destination types")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -177,8 +214,8 @@ struct OnboardingScreen: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.tertiary)
                 }
-                .padding(16)
-                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .padding(HP.Spacing.xl)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: HP.Radius.sheet, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Add Destination")
@@ -188,7 +225,7 @@ struct OnboardingScreen: View {
     }
 
     private var footerActions: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: HP.Spacing.lg) {
             Text("You can revisit this guide from Settings at any time.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -200,7 +237,7 @@ struct OnboardingScreen: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 52)
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: HP.Radius.sheet, style: .continuous))
                     .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
@@ -213,23 +250,24 @@ struct OnboardingScreen: View {
             .font(.caption.weight(.medium))
             .lineLimit(nil)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, HP.Spacing.lg)
+            .padding(.vertical, HP.Spacing.md)
             .background(Color(.secondarySystemGroupedBackground), in: Capsule())
     }
 
     private func checklistRow(title: String, detail: String, isComplete: Bool) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: HP.Spacing.lg) {
             Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
                 .font(.title3)
                 .foregroundStyle(isComplete ? Color.green : Color.secondary)
+                .symbolRenderingMode(.hierarchical)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: HP.Spacing.xs) {
                 Text(title)
-                    .font(.headline)
+                    .font(HP.Typography.sectionTitle)
                 Text(detail)
-                    .font(.subheadline)
+                    .font(HP.Typography.cardBody)
                     .foregroundStyle(.secondary)
             }
 
@@ -262,9 +300,9 @@ struct OnboardingScreen: View {
 
 private extension View {
     func sectionCardStyle() -> some View {
-        padding(20)
+        padding(HP.Spacing.xxl)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: HP.Radius.section, style: .continuous))
     }
 }
 

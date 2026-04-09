@@ -80,8 +80,8 @@ struct DestinationsScreen: View {
             } label: {
                 Text("Add Destination")
                     .font(.headline)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, HP.Spacing.xxl)
+                    .padding(.vertical, HP.Spacing.mdLg)
                     .background(Color.accentColor, in: Capsule())
                     .foregroundStyle(.white)
             }
@@ -90,7 +90,7 @@ struct DestinationsScreen: View {
 
     private var destinationList: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
+            LazyVStack(spacing: HP.Spacing.lg) {
                 ForEach(destinationManager.destinations, id: \.id) { config in
                     Button {
                         selectedConfig = config
@@ -98,6 +98,11 @@ struct DestinationsScreen: View {
                         DestinationCard(config: config)
                     }
                     .buttonStyle(.plain)
+                    .scrollTransition { content, phase in
+                        content
+                            .opacity(phase.isIdentity ? 1 : 0.3)
+                            .scaleEffect(phase.isIdentity ? 1 : 0.95)
+                    }
                     .accessibilityHint("Double tap to edit, long press for more options")
                     .contextMenu {
                         Button {
@@ -135,9 +140,9 @@ struct DestinationsScreen: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 32)
+            .padding(.horizontal, HP.Spacing.xl)
+            .padding(.top, HP.Spacing.md)
+            .padding(.bottom, HP.Spacing.jumbo)
         }
         .background(Color(.systemGroupedBackground))
     }

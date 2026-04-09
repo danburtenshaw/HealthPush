@@ -14,23 +14,19 @@ struct SyncStatusCard: View {
     var isSyncOverdue = false
     var hasSyncIssues = false
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    @State private var pulseScale: CGFloat = 1.0
-
     // MARK: Body
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: HP.Spacing.xl) {
             // Status indicator
-            HStack(spacing: 12) {
+            HStack(spacing: HP.Spacing.lg) {
                 statusIcon
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: HP.Spacing.xxs) {
                     Text(statusTitle)
-                        .font(.headline)
+                        .font(HP.Typography.sectionTitle)
                         .foregroundStyle(statusColor)
                     Text(statusSubtitle)
-                        .font(.caption)
+                        .font(HP.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -52,7 +48,8 @@ struct SyncStatusCard: View {
                 StatItem(
                     title: "Points Today",
                     value: "\(dataPointsSyncedToday)",
-                    icon: "chart.bar.fill"
+                    icon: "chart.bar.fill",
+                    animateValue: true
                 )
 
                 Divider()
@@ -61,18 +58,19 @@ struct SyncStatusCard: View {
                 StatItem(
                     title: "Total Syncs",
                     value: "\(totalSyncsCompleted)",
-                    icon: "checkmark.circle.fill"
+                    icon: "checkmark.circle.fill",
+                    animateValue: true
                 )
             }
         }
-        .padding(20)
+        .padding(HP.Spacing.xxl)
         .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: HP.Radius.lg, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: HP.Radius.lg, style: .continuous)
                 .strokeBorder(
                     statusColor.opacity(0.3),
                     lineWidth: 1
@@ -91,30 +89,16 @@ struct SyncStatusCard: View {
                 .frame(width: 44, height: 44)
 
             if isSyncing {
-                if !reduceMotion {
-                    Circle()
-                        .fill(statusColor.opacity(0.08))
-                        .frame(width: 44, height: 44)
-                        .scaleEffect(pulseScale)
-                        .onAppear {
-                            withAnimation(
-                                .easeInOut(duration: 1.0)
-                                    .repeatForever(autoreverses: true)
-                            ) {
-                                pulseScale = 1.4
-                            }
-                        }
-                        .onDisappear {
-                            pulseScale = 1.0
-                        }
-                }
-
-                ProgressView()
-                    .tint(statusColor)
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(statusColor)
+                    .symbolRenderingMode(.hierarchical)
+                    .symbolEffect(.pulse, options: .repeating, isActive: isSyncing)
             } else {
                 Image(systemName: statusIconName)
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(statusColor)
+                    .symbolRenderingMode(.hierarchical)
             }
         }
         .accessibilityHidden(true)
@@ -180,13 +164,15 @@ private struct StatItem: View {
     let title: String
     let value: String
     let icon: String
+    var animateValue = false
 
     var body: some View {
-        VStack(spacing: 4) {
-            HStack(spacing: 4) {
+        VStack(spacing: HP.Spacing.xs) {
+            HStack(spacing: HP.Spacing.xs) {
                 Image(systemName: icon)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .symbolRenderingMode(.hierarchical)
                 Text(title)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -194,6 +180,8 @@ private struct StatItem: View {
             Text(value)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
+                .contentTransition(.numericText())
+                .animation(.default, value: value)
         }
         .frame(maxWidth: .infinity)
     }
@@ -202,7 +190,7 @@ private struct StatItem: View {
 // MARK: - Preview
 
 #Preview {
-    VStack(spacing: 20) {
+    VStack(spacing: HP.Spacing.xxl) {
         SyncStatusCard(
             isSyncing: false,
             lastSyncTime: "5 min ago",

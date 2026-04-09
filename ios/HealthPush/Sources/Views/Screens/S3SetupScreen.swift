@@ -6,7 +6,7 @@ import SwiftUI
 /// Configuration screen for setting up an S3-compatible destination.
 ///
 /// Provides fields for bucket name, region, optional custom endpoint, access keys, path prefix,
-/// export format, a connection test button, and a metric picker.
+/// export format, a floating connection test bar, and a metric picker.
 struct S3SetupScreen: View {
     // MARK: Properties
 
@@ -35,8 +35,7 @@ struct S3SetupScreen: View {
     @State private var includeSourceMetadata = false
     @State private var isEnabled = true
 
-    @State private var isTesting = false
-    @State private var testResult: S3TestResult?
+    @State private var connectionTestState: ConnectionTestState = .idle
     @State private var showingMetricPicker = false
     @State private var showingDeleteConfirmation = false
 
@@ -48,7 +47,6 @@ struct S3SetupScreen: View {
                 connectionSection
                 authenticationSection
                 storageSection
-                testConnectionSection
                 syncWindowSection
                 metricsSection
 
@@ -56,6 +54,9 @@ struct S3SetupScreen: View {
                     enabledSection
                     dangerZoneSection
                 }
+            }
+            .safeAreaInset(edge: .bottom) {
+                connectionTestBar
             }
             .navigationTitle(isEditing ? "Edit Destination" : "Add S3 Storage")
             .navigationBarTitleDisplayMode(.inline)
@@ -80,6 +81,8 @@ struct S3SetupScreen: View {
                 Text("This will permanently remove this destination and stop all syncing to it.")
             }
         }
+        .presentationDetents([.medium, .large])
+        .presentationBackgroundInteraction(.enabled(upThrough: .medium))
     }
 
     // MARK: Sections
@@ -94,20 +97,30 @@ struct S3SetupScreen: View {
             }
 
             LabeledContent {
-                TextField("my-health-data", text: $bucketName)
-                    .multilineTextAlignment(.trailing)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+                HStack(spacing: HP.Spacing.sm) {
+                    TextField("my-health-data", text: $bucketName)
+                        .multilineTextAlignment(.trailing)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    if !bucketName.isEmpty {
+                        fieldValidationIcon(isValid: S3TypeConfig.validateBucketName(bucketName) == nil)
+                    }
+                }
             } label: {
                 Label("Bucket", systemImage: "externaldrive.fill")
             }
 
             LabeledContent {
-                TextField("Optional", text: $customEndpoint)
-                    .multilineTextAlignment(.trailing)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
+                HStack(spacing: HP.Spacing.sm) {
+                    TextField("Optional", text: $customEndpoint)
+                        .multilineTextAlignment(.trailing)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                    if !customEndpoint.trimmingCharacters(in: .whitespaces).isEmpty {
+                        fieldValidationIcon(isValid: S3Client.validateEndpoint(customEndpoint) == nil)
+                    }
+                }
             } label: {
                 Label("Endpoint", systemImage: "network")
             }
@@ -147,30 +160,33 @@ struct S3SetupScreen: View {
 
     private var authenticationSection: some View {
         Section {
-            LabeledContent {
+            VStack(alignment: .leading, spacing: HP.Spacing.sm) {
+                Text("Access Key ID")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 TextField(
                     hasStoredAccessKeyID && accessKeyID.isEmpty ? "Saved in Keychain" : "AKIA...",
                     text: $accessKeyID
                 )
-                .multilineTextAlignment(.trailing)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .fontDesign(.monospaced)
-            } label: {
-                Label("Access Key ID", systemImage: "key.fill")
             }
+            .padding(.vertical, HP.Spacing.xxs)
 
-            LabeledContent {
+            VStack(alignment: .leading, spacing: HP.Spacing.sm) {
+                Text("Secret Access Key")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 SecureField(
                     hasStoredSecretAccessKey && secretAccessKey.isEmpty ? "Saved in Keychain" : "Secret access key",
                     text: $secretAccessKey
                 )
-                .multilineTextAlignment(.trailing)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-            } label: {
-                Label("Secret Key", systemImage: "lock.fill")
+                .fontDesign(.monospaced)
             }
+            .padding(.vertical, HP.Spacing.xxs)
         } header: {
             Text("Authentication")
         } footer: {
@@ -181,10 +197,15 @@ struct S3SetupScreen: View {
     private var storageSection: some View {
         Section {
             LabeledContent {
-                TextField("health/data", text: $pathPrefix)
-                    .multilineTextAlignment(.trailing)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+                HStack(spacing: HP.Spacing.sm) {
+                    TextField("health/data", text: $pathPrefix)
+                        .multilineTextAlignment(.trailing)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    if !pathPrefix.isEmpty {
+                        fieldValidationIcon(isValid: S3TypeConfig.validatePathPrefix(pathPrefix) == nil)
+                    }
+                }
             } label: {
                 Label("Path Prefix", systemImage: "folder.fill")
             }
@@ -205,34 +226,6 @@ struct S3SetupScreen: View {
             } else {
                 Text("Files stored as \(examplePath). Leave empty for bucket root.")
             }
-        }
-    }
-
-    private var testConnectionSection: some View {
-        Section {
-            Button {
-                Task { await testConnection() }
-            } label: {
-                HStack {
-                    Label("Test Connection", systemImage: "antenna.radiowaves.left.and.right")
-                    Spacer()
-                    if isTesting {
-                        ProgressView()
-                    } else if let testResult {
-                        testResultIndicator(testResult)
-                    }
-                }
-            }
-            .disabled(
-                isTesting
-                    || bucketName.isEmpty
-                    || !hasValidAccessKeyID
-                    || !hasValidSecretAccessKey
-                    || endpointValidationError != nil
-                    || trimmedRegion.isEmpty
-            )
-            .accessibilityLabel(s3TestConnectionAccessibilityLabel)
-            .accessibilityHint(isTesting ? "" : "Verifies the bucket, credentials, and endpoint are correct")
         }
     }
 
@@ -329,39 +322,91 @@ struct S3SetupScreen: View {
         }
     }
 
-    // MARK: Helpers
+    // MARK: Connection Test Bar
 
-    @ViewBuilder
-    private func testResultIndicator(_ result: S3TestResult) -> some View {
-        switch result {
-        case .success:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-        case let .failure(message):
-            HStack(spacing: 4) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.red)
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .lineLimit(1)
+    private var connectionTestBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            Group {
+                switch connectionTestState {
+                case .idle:
+                    Button {
+                        Task { await testConnection() }
+                    } label: {
+                        Text("Test Connection")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!isTestConnectionEnabled)
+
+                case .testing:
+                    HStack(spacing: HP.Spacing.mdLg) {
+                        ProgressView()
+                        Text("Testing...")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 44)
+
+                case .success:
+                    HStack(spacing: HP.Spacing.md) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .symbolRenderingMode(.hierarchical)
+                        Text("Connected")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.green)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 44)
+                    .transition(.opacity)
+
+                case let .failure(message):
+                    HStack(spacing: HP.Spacing.md) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                            .symbolRenderingMode(.hierarchical)
+                        Text(message)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.red)
+                            .lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 44)
+                }
             }
+            .padding(.horizontal, HP.Spacing.xl)
+            .padding(.vertical, HP.Spacing.md)
+            .background(.bar)
         }
+        .accessibilityLabel(connectionTestAccessibilityLabel)
     }
 
-    private var s3TestConnectionAccessibilityLabel: String {
-        if isTesting {
+    // MARK: Helpers
+
+    /// A small validation icon shown inline next to form fields.
+    @ViewBuilder
+    private func fieldValidationIcon(isValid: Bool) -> some View {
+        Image(systemName: isValid ? "checkmark.circle.fill" : "xmark.circle.fill")
+            .foregroundStyle(isValid ? .green : .red)
+            .font(.subheadline)
+            .accessibilityLabel(isValid ? "Valid" : "Invalid")
+    }
+
+    private var connectionTestAccessibilityLabel: String {
+        switch connectionTestState {
+        case .idle:
+            return "Test Connection"
+        case .testing:
             return "Testing connection"
+        case .success:
+            return "Connection test passed"
+        case let .failure(message):
+            return "Connection test failed: \(message)"
         }
-        if let testResult {
-            switch testResult {
-            case .success:
-                return "Test Connection, passed"
-            case let .failure(message):
-                return "Test Connection, failed: \(message)"
-            }
-        }
-        return "Test Connection"
     }
 
     private var isEditing: Bool {
@@ -379,6 +424,14 @@ struct S3SetupScreen: View {
             && hasValidSecretAccessKey
             && S3TypeConfig.validatePathPrefix(pathPrefix) == nil
             && !enabledMetrics.isEmpty
+    }
+
+    private var isTestConnectionEnabled: Bool {
+        !bucketName.isEmpty
+            && hasValidAccessKeyID
+            && hasValidSecretAccessKey
+            && endpointValidationError == nil
+            && !trimmedRegion.isEmpty
     }
 
     private var examplePath: String {
@@ -510,8 +563,7 @@ struct S3SetupScreen: View {
     }
 
     private func testConnection() async {
-        isTesting = true
-        testResult = nil
+        connectionTestState = .testing
 
         let effectiveAccessKeyID: String = if !accessKeyID.trimmingCharacters(in: .whitespaces).isEmpty {
             accessKeyID.trimmingCharacters(in: .whitespaces)
@@ -539,12 +591,18 @@ struct S3SetupScreen: View {
 
         do {
             let success = try await client.testConnection()
-            testResult = success ? .success : .failure("Test returned false")
+            if success {
+                withAnimation { connectionTestState = .success }
+                try? await Task.sleep(for: .seconds(3))
+                if case .success = connectionTestState {
+                    withAnimation { connectionTestState = .idle }
+                }
+            } else {
+                withAnimation { connectionTestState = .failure("Test returned false") }
+            }
         } catch {
-            testResult = .failure(error.localizedDescription)
+            withAnimation { connectionTestState = .failure(error.localizedDescription) }
         }
-
-        isTesting = false
     }
 
     private var hasValidAccessKeyID: Bool {
@@ -613,10 +671,12 @@ struct S3SetupScreen: View {
     ]
 }
 
-// MARK: - S3TestResult
+// MARK: - ConnectionTestState
 
-/// S3TestResult is intentionally private per file (same pattern as HomeAssistantSetupScreen).
-private enum S3TestResult {
+/// Tracks the visual state of the floating connection test bar.
+private enum ConnectionTestState {
+    case idle
+    case testing
     case success
     case failure(String)
 }

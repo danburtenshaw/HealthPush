@@ -20,8 +20,8 @@ enum SetupMode: Identifiable {
 
 /// Configuration screen for setting up a Home Assistant destination.
 ///
-/// Provides fields for the HA webhook URL and optional webhook secret, a connection
-/// test button with visual feedback, and a metric picker.
+/// Provides fields for the HA webhook URL and optional webhook secret, a floating
+/// connection test bar with visual feedback, and a metric picker.
 struct HomeAssistantSetupScreen: View {
     // MARK: Properties
 
@@ -43,8 +43,7 @@ struct HomeAssistantSetupScreen: View {
     @State private var includeSourceMetadata = false
     @State private var isEnabled = true
 
-    @State private var isTesting = false
-    @State private var testResult: ConnectionTestResult?
+    @State private var connectionTestState: HAConnectionTestState = .idle
     @State private var showingMetricPicker = false
     @State private var showingDeleteConfirmation = false
 
@@ -55,7 +54,6 @@ struct HomeAssistantSetupScreen: View {
             Form {
                 connectionSection
                 authenticationSection
-                testConnectionSection
                 syncSection
                 metricsSection
 
@@ -63,6 +61,9 @@ struct HomeAssistantSetupScreen: View {
                     enabledSection
                     dangerZoneSection
                 }
+            }
+            .safeAreaInset(edge: .bottom) {
+                connectionTestBar
             }
             .navigationTitle(isEditing ? "Edit Destination" : "Add Home Assistant")
             .navigationBarTitleDisplayMode(.inline)
@@ -87,6 +88,8 @@ struct HomeAssistantSetupScreen: View {
                 Text("This will permanently remove this destination and stop all syncing to it.")
             }
         }
+        .presentationDetents([.medium, .large])
+        .presentationBackgroundInteraction(.enabled(upThrough: .medium))
     }
 
     // MARK: Sections
@@ -100,11 +103,16 @@ struct HomeAssistantSetupScreen: View {
                 Label("Name", systemImage: "tag.fill")
             }
 
-            TextField("Webhook URL", text: $baseURL)
-                .textContentType(.URL)
-                .keyboardType(.URL)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
+            HStack(spacing: HP.Spacing.sm) {
+                TextField("Webhook URL", text: $baseURL)
+                    .textContentType(.URL)
+                    .keyboardType(.URL)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                if !baseURL.trimmingCharacters(in: .whitespaces).isEmpty {
+                    webhookValidationIcon
+                }
+            }
 
             if case let .invalid(message) = urlValidation, !message.isEmpty {
                 Label(message, systemImage: "exclamationmark.triangle.fill")
@@ -153,27 +161,6 @@ struct HomeAssistantSetupScreen: View {
             Text("Security")
         } footer: {
             Text(securityFooterText)
-        }
-    }
-
-    private var testConnectionSection: some View {
-        Section {
-            Button {
-                Task { await testConnection() }
-            } label: {
-                HStack {
-                    Label("Test Connection", systemImage: "antenna.radiowaves.left.and.right")
-                    Spacer()
-                    if isTesting {
-                        ProgressView()
-                    } else if let testResult {
-                        testResultIndicator(testResult)
-                    }
-                }
-            }
-            .disabled(isTesting || baseURL.isEmpty)
-            .accessibilityLabel(testConnectionAccessibilityLabel)
-            .accessibilityHint(isTesting ? "" : "Verifies the webhook URL and secret are correct")
         }
     }
 
@@ -251,39 +238,98 @@ struct HomeAssistantSetupScreen: View {
         }
     }
 
+    // MARK: Connection Test Bar
+
+    private var connectionTestBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            Group {
+                switch connectionTestState {
+                case .idle:
+                    Button {
+                        Task { await testConnection() }
+                    } label: {
+                        Text("Test Connection")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(baseURL.trimmingCharacters(in: .whitespaces).isEmpty)
+
+                case .testing:
+                    HStack(spacing: HP.Spacing.mdLg) {
+                        ProgressView()
+                        Text("Testing...")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 44)
+
+                case .success:
+                    HStack(spacing: HP.Spacing.md) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .symbolRenderingMode(.hierarchical)
+                        Text("Connected")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.green)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 44)
+                    .transition(.opacity)
+
+                case let .failure(message):
+                    HStack(spacing: HP.Spacing.md) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                            .symbolRenderingMode(.hierarchical)
+                        Text(message)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.red)
+                            .lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 44)
+                }
+            }
+            .padding(.horizontal, HP.Spacing.xl)
+            .padding(.vertical, HP.Spacing.md)
+            .background(.bar)
+        }
+        .accessibilityLabel(connectionTestAccessibilityLabel)
+    }
+
     // MARK: Helpers
 
+    /// Inline validation icon for the webhook URL field.
     @ViewBuilder
-    private func testResultIndicator(_ result: ConnectionTestResult) -> some View {
-        switch result {
-        case .success:
+    private var webhookValidationIcon: some View {
+        if urlValidation.isAcceptable {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
-        case let .failure(message):
-            HStack(spacing: 4) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.red)
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .lineLimit(1)
-            }
+                .font(.subheadline)
+                .accessibilityLabel("Valid")
+        } else {
+            Image(systemName: "xmark.circle.fill")
+                .foregroundStyle(.red)
+                .font(.subheadline)
+                .accessibilityLabel("Invalid")
         }
     }
 
-    private var testConnectionAccessibilityLabel: String {
-        if isTesting {
+    private var connectionTestAccessibilityLabel: String {
+        switch connectionTestState {
+        case .idle:
+            return "Test Connection"
+        case .testing:
             return "Testing connection"
+        case .success:
+            return "Connection test passed"
+        case let .failure(message):
+            return "Connection test failed: \(message)"
         }
-        if let testResult {
-            switch testResult {
-            case .success:
-                return "Test Connection, passed"
-            case let .failure(message):
-                return "Test Connection, failed: \(message)"
-            }
-        }
-        return "Test Connection"
     }
 
     private var isEditing: Bool {
@@ -400,8 +446,7 @@ struct HomeAssistantSetupScreen: View {
     }
 
     private func testConnection() async {
-        isTesting = true
-        testResult = nil
+        connectionTestState = .testing
 
         let effectiveToken: String = if !apiToken.trimmingCharacters(in: .whitespaces).isEmpty {
             apiToken.trimmingCharacters(in: .whitespaces)
@@ -418,12 +463,18 @@ struct HomeAssistantSetupScreen: View {
 
         do {
             let success = try await destination.testConnection()
-            testResult = success ? .success : .failure("Test returned false")
+            if success {
+                withAnimation { connectionTestState = .success }
+                try? await Task.sleep(for: .seconds(3))
+                if case .success = connectionTestState {
+                    withAnimation { connectionTestState = .idle }
+                }
+            } else {
+                withAnimation { connectionTestState = .failure("Test returned false") }
+            }
         } catch {
-            testResult = .failure(error.localizedDescription)
+            withAnimation { connectionTestState = .failure(error.localizedDescription) }
         }
-
-        isTesting = false
     }
 
     private var securityFooterText: String {
@@ -440,9 +491,12 @@ struct HomeAssistantSetupScreen: View {
     }
 }
 
-// MARK: - ConnectionTestResult
+// MARK: - HAConnectionTestState
 
-private enum ConnectionTestResult {
+/// Tracks the visual state of the floating connection test bar for HA setup.
+private enum HAConnectionTestState {
+    case idle
+    case testing
     case success
     case failure(String)
 }

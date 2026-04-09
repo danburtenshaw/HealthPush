@@ -11,27 +11,29 @@ struct DestinationCard: View {
     // MARK: Body
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: HP.Spacing.lgXl) {
             // Destination icon
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: HP.Radius.md, style: .continuous)
                     .fill(iconBackgroundColor.opacity(0.15))
                     .frame(width: 48, height: 48)
 
                 Image(systemName: config.destinationType.symbolName)
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(iconBackgroundColor)
+                    .symbolRenderingMode(.hierarchical)
             }
 
             // Destination info
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: HP.Spacing.xs) {
                 Text(config.name)
-                    .font(.headline)
+                    .font(HP.Typography.sectionTitle)
 
                 if config.needsReauth {
-                    HStack(spacing: 4) {
+                    HStack(spacing: HP.Spacing.xs) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.caption)
+                            .symbolRenderingMode(.hierarchical)
                         Text("Credentials needed")
                             .font(.caption.weight(.medium))
                     }
@@ -40,7 +42,7 @@ struct DestinationCard: View {
                     .accessibilityLabel("Credentials needed. Tap to re-enter.")
                 }
 
-                HStack(spacing: 6) {
+                HStack(spacing: HP.Spacing.sm) {
                     Circle()
                         .fill(config.isEnabled ? .green : .gray)
                         .frame(width: 8, height: 8)
@@ -54,10 +56,11 @@ struct DestinationCard: View {
                         .foregroundStyle(.tertiary)
                 }
 
-                HStack(spacing: 6) {
+                HStack(spacing: HP.Spacing.sm) {
                     Image(systemName: "clock.fill")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
+                        .symbolRenderingMode(.hierarchical)
                     Text(config.syncFrequency.displayName)
                         .font(.caption)
                         .foregroundStyle(.tertiary)
@@ -71,6 +74,7 @@ struct DestinationCard: View {
                             Text("  Next: \(nextSync, style: .relative)")
                                 .font(.caption)
                                 .foregroundStyle(.tertiary)
+                                .accessibilityLabel("Next sync: \(nextSync.formatted(date: .abbreviated, time: .shortened))")
                         }
                     }
                 }
@@ -93,14 +97,14 @@ struct DestinationCard: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.tertiary)
         }
-        .padding(16)
+        .padding(HP.Spacing.xl)
         .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: HP.Radius.card, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(0.06), radius: 6, y: 3)
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: HP.Radius.card, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
@@ -170,7 +174,8 @@ struct DestinationCard: View {
                 Text("Full re-sync queued")
             }
         } else if let lastSyncedAt = config.lastSyncedAt {
-            Text("Last synced ") + Text(lastSyncedAt, style: .relative) + Text(" ago")
+            (Text("Last synced ") + Text(lastSyncedAt, style: .relative) + Text(" ago"))
+                .accessibilityLabel("Last synced \(lastSyncedAt.formatted(date: .abbreviated, time: .shortened))")
         } else {
             Text("Ready for first sync")
         }
@@ -202,7 +207,7 @@ struct DestinationCard: View {
 // MARK: - Preview
 
 #Preview {
-    VStack(spacing: 12) {
+    VStack(spacing: HP.Spacing.lg) {
         DestinationCard(config: DestinationConfig(
             name: "Home Assistant",
             destinationType: .homeAssistant,

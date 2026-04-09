@@ -50,6 +50,7 @@ struct S3Client {
 
     #if canImport(os)
     private let logger = Logger(subsystem: "app.healthpush", category: "S3Client")
+    private let signposter = OSSignposter(subsystem: "app.healthpush", category: "Performance")
     #endif
 
     init(
@@ -103,6 +104,9 @@ struct S3Client {
     /// - Parameter key: The S3 object key.
     /// - Returns: The object data, or `nil` if the object does not exist (HTTP 404).
     func getObject(key: String) async throws -> Data? {
+        #if canImport(os)
+        let state = signposter.beginInterval("getObject")
+        #endif
         let url = try objectURL(for: key)
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -110,9 +114,15 @@ struct S3Client {
 
         let (data, response) = try await perform(request)
         guard let http = response as? HTTPURLResponse else {
+            #if canImport(os)
+            signposter.endInterval("getObject", state)
+            #endif
             throw S3Error.connectionFailed("Invalid response")
         }
 
+        #if canImport(os)
+        signposter.endInterval("getObject", state)
+        #endif
         switch http.statusCode {
         case 200...299:
             return data
@@ -132,6 +142,9 @@ struct S3Client {
     ///   - data: The object data.
     ///   - contentType: The MIME content type.
     func putObject(key: String, data: Data, contentType: String) async throws {
+        #if canImport(os)
+        let state = signposter.beginInterval("putObject")
+        #endif
         let url = try objectURL(for: key)
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
@@ -143,9 +156,15 @@ struct S3Client {
 
         let (responseData, response) = try await perform(request)
         guard let http = response as? HTTPURLResponse else {
+            #if canImport(os)
+            signposter.endInterval("putObject", state)
+            #endif
             throw S3Error.connectionFailed("Invalid response")
         }
 
+        #if canImport(os)
+        signposter.endInterval("putObject", state)
+        #endif
         switch http.statusCode {
         case 200...299:
             #if canImport(os)

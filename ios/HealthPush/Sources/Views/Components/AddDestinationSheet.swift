@@ -19,11 +19,11 @@ struct AddDestinationSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: HP.Spacing.lg) {
                 Text("Choose a destination type")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, HP.Spacing.xs)
 
                 ForEach(DestinationType.allCases) { type in
                     Button {
@@ -37,8 +37,8 @@ struct AddDestinationSheet: View {
 
                 Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
+            .padding(.horizontal, HP.Spacing.xxl)
+            .padding(.top, HP.Spacing.lg)
             .navigationTitle("Add Destination")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -57,14 +57,15 @@ struct AddDestinationSheet: View {
     // MARK: Subviews
 
     private func destinationRow(for type: DestinationType) -> some View {
-        HStack(spacing: 14) {
+        HStack(spacing: HP.Spacing.lgXl) {
             Image(systemName: type.symbolName)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
+                .symbolRenderingMode(.hierarchical)
                 .frame(width: 44, height: 44)
-                .background(iconColor(for: type), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(iconColor(for: type), in: RoundedRectangle(cornerRadius: HP.Radius.md, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: HP.Spacing.xxs) {
                 Text(type.displayName)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
@@ -81,9 +82,9 @@ struct AddDestinationSheet: View {
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
         }
-        .padding(16)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(HP.Spacing.xl)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: HP.Radius.lg, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: HP.Radius.lg, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens \(type.displayName) setup")
     }

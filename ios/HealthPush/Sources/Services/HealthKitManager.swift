@@ -51,6 +51,7 @@ actor HealthKitManager: HealthKitReading {
 
     private let healthStore: HKHealthStore
     private let logger = Logger(subsystem: "app.healthpush", category: "HealthKit")
+    private let signposter = OSSignposter(subsystem: "app.healthpush", category: "Performance")
     private var observerQueries: [HKObserverQuery] = []
 
     // MARK: Initialization
@@ -106,6 +107,7 @@ actor HealthKitManager: HealthKitReading {
         from start: Date,
         to end: Date
     ) async -> HealthDataQueryResult {
+        let state = signposter.beginInterval("queryData")
         var allDataPoints: [HealthDataPoint] = []
         var issues: [HealthMetricQueryIssue] = []
 
@@ -122,6 +124,7 @@ actor HealthKitManager: HealthKitReading {
             }
         }
 
+        signposter.endInterval("queryData", state)
         return HealthDataQueryResult(dataPoints: allDataPoints, issues: issues)
     }
 
@@ -140,6 +143,7 @@ actor HealthKitManager: HealthKitReading {
         from start: Date,
         to end: Date
     ) async -> HealthDataQueryResult {
+        let state = signposter.beginInterval("queryDailyStatistics")
         let calendar = Calendar.current
         let anchorDate = calendar.startOfDay(for: start)
         let daily = DateComponents(day: 1)
@@ -170,6 +174,7 @@ actor HealthKitManager: HealthKitReading {
             }
         }
 
+        signposter.endInterval("queryDailyStatistics", state)
         return HealthDataQueryResult(dataPoints: allDataPoints, issues: issues)
     }
 

@@ -1,9 +1,11 @@
+import Charts
 import SwiftData
 import SwiftUI
 
 // MARK: - SyncHistoryScreen
 
-/// Screen displaying a chronological log of past sync operations with status, counts, and errors.
+/// Screen displaying a chronological log of past sync operations with a stacked bar chart,
+/// status filters, search, and tappable rows linking to detail views.
 struct SyncHistoryScreen: View {
     // MARK: Properties
 
@@ -14,6 +16,8 @@ struct SyncHistoryScreen: View {
     private var syncRecords: [SyncRecord]
 
     @State private var selectedFilter: SyncHistoryFilter = .all
+    @State private var searchText = ""
+    @State private var selectedChartDay: Date?
 
     // MARK: Body
 
@@ -61,40 +65,130 @@ struct SyncHistoryScreen: View {
         ContentUnavailableView {
             Label("No Sync History", systemImage: "clock.arrow.circlepath")
         } description: {
-            if selectedFilter == .all {
+            if selectedFilter == .all && searchText.isEmpty {
                 Text("Sync history will appear here after your first sync.")
             } else {
-                Text("No syncs match the selected filter.")
+                Text("No syncs match the selected filter or search.")
             }
         }
     }
 
     private var recordList: some View {
         List {
+            if !chartData.isEmpty {
+                chartSection
+            }
+
+            if selectedChartDay != nil {
+                Section {
+                    Button {
+                        withAnimation { selectedChartDay = nil }
+                    } label: {
+                        Label("Clear Day Filter", systemImage: "xmark.circle")
+                    }
+                }
+            }
+
             ForEach(groupedByDate, id: \.key) { dateKey, records in
                 Section(dateKey) {
                     ForEach(records) { record in
-                        SyncRecordRow(record: record)
+                        NavigationLink(value: record.id) {
+                            SyncRecordRow(record: record)
+                        }
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .searchable(text: $searchText, prompt: "Search by destination or error")
+        .navigationDestination(for: UUID.self) { recordID in
+            if let record = syncRecords.first(where: { $0.id == recordID }) {
+                SyncRecordDetailView(record: record)
+            }
+        }
+    }
+
+    private var chartSection: some View {
+        Section("Syncs Per Day") {
+            Chart(chartData) { entry in
+                BarMark(
+                    x: .value("Date", entry.date, unit: .day),
+                    y: .value("Count", entry.count)
+                )
+                .foregroundStyle(by: .value("Destination", entry.destinationName))
+            }
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .day)) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.weekday(.abbreviated), centered: true)
+                }
+            }
+            .chartOverlay { proxy in
+                GeometryReader { geometry in
+                    Rectangle()
+                        .fill(.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture { location in
+                            handleChartTap(at: location, proxy: proxy, geometry: geometry)
+                        }
+                }
+            }
+            .frame(height: 200)
+            .padding(.vertical, HP.Spacing.xs)
+            .accessibilityLabel("Stacked bar chart showing syncs per day by destination")
+        }
+    }
+
+    // MARK: Chart Interaction
+
+    private func handleChartTap(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        let plotFrame = geometry[proxy.plotFrame!]
+        let relativeX = location.x - plotFrame.origin.x
+
+        guard let tappedDate: Date = proxy.value(atX: relativeX) else { return }
+        let calendar = Calendar.current
+        let tappedDay = calendar.startOfDay(for: tappedDate)
+
+        withAnimation {
+            if selectedChartDay == tappedDay {
+                selectedChartDay = nil
+            } else {
+                selectedChartDay = tappedDay
+            }
+        }
     }
 
     // MARK: Data
 
     private var filteredRecords: [SyncRecord] {
+        var records: [SyncRecord]
         switch selectedFilter {
         case .all:
-            syncRecords
+            records = syncRecords
         case .success:
-            syncRecords.filter { $0.status == .success }
+            records = syncRecords.filter { $0.status == .success }
         case .failed:
-            syncRecords.filter { $0.status == .failure || $0.status == .partialFailure }
+            records = syncRecords.filter { $0.status == .failure || $0.status == .partialFailure }
         case .background:
-            syncRecords.filter(\.isBackgroundSync)
+            records = syncRecords.filter(\.isBackgroundSync)
         }
+
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            records = records.filter { record in
+                record.destinationName.lowercased().contains(query)
+                    || (record.errorMessage?.lowercased().contains(query) ?? false)
+            }
+        }
+
+        if let selectedDay = selectedChartDay {
+            let calendar = Calendar.current
+            records = records.filter { record in
+                calendar.isDate(record.timestamp, inSameDayAs: selectedDay)
+            }
+        }
+
+        return records
     }
 
     private var groupedByDate: [(key: String, value: [SyncRecord])] {
@@ -115,6 +209,47 @@ struct SyncHistoryScreen: View {
                 }
                 return lhsDate > rhsDate
             }
+    }
+
+    // MARK: Chart Data
+
+    private var chartData: [SyncChartEntry] {
+        let calendar = Calendar.current
+
+        // Only chart the last 7 days of records
+        let sevenDaysAgo = calendar.startOfDay(for: calendar.date(byAdding: .day, value: -6, to: .now) ?? .now)
+        let recentRecords = syncRecords.filter { $0.timestamp >= sevenDaysAgo }
+
+        guard !recentRecords.isEmpty else { return [] }
+
+        let grouped = Dictionary(grouping: recentRecords) { record -> String in
+            let day = calendar.startOfDay(for: record.timestamp)
+            return "\(day.timeIntervalSince1970)|\(record.destinationName)"
+        }
+
+        return grouped.map { _, records in
+            let first = records[0]
+            let day = calendar.startOfDay(for: first.timestamp)
+            return SyncChartEntry(
+                date: day,
+                destinationName: first.destinationName,
+                count: records.count
+            )
+        }
+        .sorted { $0.date < $1.date }
+    }
+}
+
+// MARK: - SyncChartEntry
+
+/// A single data point for the sync history chart.
+struct SyncChartEntry: Identifiable {
+    let date: Date
+    let destinationName: String
+    let count: Int
+
+    var id: String {
+        "\(date.timeIntervalSince1970)-\(destinationName)"
     }
 }
 
@@ -151,82 +286,48 @@ private enum SyncHistoryFilter: String, CaseIterable, Identifiable {
 
 // MARK: - SyncRecordRow
 
-private struct SyncRecordRow: View {
+struct SyncRecordRow: View {
     let record: SyncRecord
 
-    @State private var isExpanded = false
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Main row
-            HStack(spacing: 12) {
-                statusIcon
+        HStack(spacing: HP.Spacing.lg) {
+            statusIcon
 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(record.destinationName)
-                            .font(.subheadline.weight(.medium))
+            VStack(alignment: .leading, spacing: HP.Spacing.xxs) {
+                HStack(spacing: HP.Spacing.sm) {
+                    Text(record.destinationName)
+                        .font(.subheadline.weight(.medium))
 
-                        if record.isBackgroundSync {
-                            Text("BG")
-                                .font(.caption2.weight(.semibold))
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(Color.purple.opacity(0.15), in: Capsule())
-                                .foregroundStyle(.purple)
-                        }
-                    }
-
-                    HStack(spacing: 8) {
-                        Text("\(record.dataPointCount) points")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Text(formattedDuration)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                    if record.isBackgroundSync {
+                        Text("BG")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.purple.opacity(0.15), in: Capsule())
+                            .foregroundStyle(.purple)
                     }
                 }
 
-                Spacer()
+                HStack(spacing: HP.Spacing.md) {
+                    Text("\(record.dataPointCount) points")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
-                Text(record.timestamp, style: .time)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(recordAccessibilityLabel)
-
-            // Error detail (expandable)
-            if let errorMessage = record.errorMessage {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isExpanded.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption2)
-                            .foregroundStyle(.orange)
-
-                        Text(isExpanded ? errorMessage : "Tap to see error details")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(isExpanded ? nil : 1)
-
-                        Spacer()
-
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
+                    Text(formattedDuration)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(isExpanded ? "Error: \(errorMessage)" : "Error details available")
-                .accessibilityHint(isExpanded ? "Double tap to collapse" : "Double tap to expand error details")
             }
+
+            Spacer()
+
+            Text(record.timestamp, style: .time)
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(recordAccessibilityLabel)
+        .padding(.vertical, HP.Spacing.xs)
     }
 
     // MARK: Helpers
@@ -256,6 +357,7 @@ private struct SyncRecordRow: View {
         Image(systemName: iconName)
             .font(.body.weight(.medium))
             .foregroundStyle(iconColor)
+            .symbolRenderingMode(.hierarchical)
             .frame(width: 28)
     }
 
