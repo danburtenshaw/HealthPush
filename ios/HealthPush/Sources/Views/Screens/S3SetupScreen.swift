@@ -49,14 +49,12 @@ struct S3SetupScreen: View {
                 storageSection
                 syncWindowSection
                 metricsSection
+                connectionTestSection
 
                 if isEditing {
                     enabledSection
                     dangerZoneSection
                 }
-            }
-            .safeAreaInset(edge: .bottom) {
-                connectionTestBar
             }
             .navigationTitle(isEditing ? "Edit Destination" : "Add S3 Storage")
             .navigationBarTitleDisplayMode(.inline)
@@ -322,65 +320,60 @@ struct S3SetupScreen: View {
         }
     }
 
-    // MARK: Connection Test Bar
+    // MARK: Connection Test Section
 
-    private var connectionTestBar: some View {
-        VStack(spacing: 0) {
-            Divider()
-            Group {
-                switch connectionTestState {
-                case .idle:
-                    Button {
-                        Task { await testConnection() }
-                    } label: {
+    private var connectionTestSection: some View {
+        Section {
+            switch connectionTestState {
+            case .idle:
+                Button {
+                    Task { await testConnection() }
+                } label: {
+                    HStack {
+                        Spacer()
                         Text("Test Connection")
                             .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .frame(minHeight: 44)
+                        Spacer()
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!isTestConnectionEnabled)
+                }
+                .disabled(!isTestConnectionEnabled)
 
-                case .testing:
-                    HStack(spacing: HP.Spacing.mdLg) {
-                        ProgressView()
-                        Text("Testing...")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 44)
+            case .testing:
+                HStack(spacing: HP.Spacing.mdLg) {
+                    Spacer()
+                    ProgressView()
+                    Text("Testing...")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
 
-                case .success:
-                    HStack(spacing: HP.Spacing.md) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                            .symbolRenderingMode(.hierarchical)
-                        Text("Connected")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.green)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 44)
-                    .transition(.opacity)
+            case .success:
+                HStack(spacing: HP.Spacing.md) {
+                    Spacer()
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .symbolRenderingMode(.hierarchical)
+                    Text("Connected")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.green)
+                    Spacer()
+                }
+                .transition(.opacity)
 
-                case let .failure(message):
-                    HStack(spacing: HP.Spacing.md) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.red)
-                            .symbolRenderingMode(.hierarchical)
-                        Text(message)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.red)
-                            .lineLimit(2)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(minHeight: 44)
+            case let .failure(message):
+                HStack(spacing: HP.Spacing.md) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.red)
+                        .symbolRenderingMode(.hierarchical)
+                    Text(message)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
                 }
             }
-            .padding(.horizontal, HP.Spacing.xl)
-            .padding(.vertical, HP.Spacing.md)
-            .background(.bar)
+        } footer: {
+            Text("Verify your bucket and credentials are working before saving.")
         }
         .accessibilityLabel(connectionTestAccessibilityLabel)
     }

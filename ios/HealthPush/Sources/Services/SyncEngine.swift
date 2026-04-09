@@ -35,7 +35,14 @@ struct SyncDestinationError {
 
 /// The result of a sync operation.
 struct SyncResult {
+    /// Number of new or updated data points actually written to destinations.
     let dataPointCount: Int
+
+    /// Total data points returned by HealthKit before deduplication.
+    /// When this is non-zero but `dataPointCount` is zero, dedup filtered everything
+    /// and the sync is working correctly -- no "no data" warning should be shown.
+    let processedDataPointCount: Int
+
     let successfulDestinations: Int
     let failedDestinations: Int
     let duration: TimeInterval
@@ -128,6 +135,7 @@ final class SyncEngine {
             signposter.endInterval("performSync", syncState)
             return SyncResult(
                 dataPointCount: 0,
+                processedDataPointCount: 0,
                 successfulDestinations: 0,
                 failedDestinations: 0,
                 duration: Date().timeIntervalSince(startTime),
@@ -140,6 +148,7 @@ final class SyncEngine {
             signposter.endInterval("performSync", syncState)
             return SyncResult(
                 dataPointCount: 0,
+                processedDataPointCount: 0,
                 successfulDestinations: 0,
                 failedDestinations: 0,
                 duration: Date().timeIntervalSince(startTime),
@@ -154,6 +163,7 @@ final class SyncEngine {
         var successCount = 0
         var failCount = 0
         var totalDataPoints = 0
+        var totalProcessedPoints = 0
         var errors: [SyncDestinationError] = []
 
         for config in destinations {
@@ -215,6 +225,7 @@ final class SyncEngine {
                 onProgress: onProgress
             )
             totalDataPoints += result.dataPointCount
+            totalProcessedPoints += result.processedDataPointCount
             successCount += result.successCount
             failCount += result.failCount
             errors.append(contentsOf: result.errors)
@@ -238,6 +249,7 @@ final class SyncEngine {
         signposter.endInterval("performSync", syncState)
         return SyncResult(
             dataPointCount: totalDataPoints,
+            processedDataPointCount: totalProcessedPoints,
             successfulDestinations: successCount,
             failedDestinations: failCount,
             duration: duration,
@@ -278,6 +290,7 @@ final class SyncEngine {
     /// Result of syncing a single destination, used to aggregate into the overall SyncResult.
     private struct DestinationSyncResult {
         var dataPointCount: Int = 0
+        var processedDataPointCount: Int = 0
         var successCount: Int = 0
         var failCount: Int = 0
         var errors: [SyncDestinationError] = []
@@ -316,6 +329,7 @@ final class SyncEngine {
             let stats = try await destination.sync(data: dataPoints, onProgress: progressCallback)
 
             result.dataPointCount = stats.newCount
+            result.processedDataPointCount = stats.processedCount
             record.dataPointCount = stats.newCount
             record.duration = Date().timeIntervalSince(startTime)
 

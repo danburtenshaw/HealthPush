@@ -51,7 +51,6 @@ struct AddDestinationSheet: View {
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Color(.systemGroupedBackground))
     }
 
     // MARK: Subviews

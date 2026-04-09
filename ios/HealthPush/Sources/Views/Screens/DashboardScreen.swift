@@ -529,12 +529,21 @@ struct DashboardScreen: View {
             .contains { $0.lastSyncedAt == nil }
     }
 
+    /// For each enabled destination, check if its most recent sync record is a failure.
+    /// Only show a nudge if the very latest record for any destination is a failure.
+    /// This way, if a sync fails but a retry succeeds, the nudge disappears.
     private var latestIssueRecord: SyncRecord? {
-        guard let latestRecord = allSyncs.first else { return nil }
-        guard latestRecord.status == .failure || latestRecord.status == .partialFailure else {
-            return nil
+        let enabledIDs = Set(destinationManager.destinations.filter(\.isEnabled).map(\.id))
+
+        for destID in enabledIDs {
+            guard let latestForDest = allSyncs.first(where: { $0.destinationID == destID }) else {
+                continue
+            }
+            if latestForDest.status == .failure || latestForDest.status == .partialFailure {
+                return latestForDest
+            }
         }
-        return latestRecord
+        return nil
     }
 
     private func navigateToRecovery(record: SyncRecord) {

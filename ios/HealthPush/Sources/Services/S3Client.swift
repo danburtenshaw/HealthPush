@@ -281,6 +281,8 @@ struct S3Client {
             return try await session.data(for: request)
         } catch let error as URLError {
             switch error.code {
+            case .cancelled:
+                throw S3Error.connectionFailed("Request was cancelled")
             case .timedOut:
                 throw S3Error.connectionFailed("Request timed out")
             case .notConnectedToInternet,

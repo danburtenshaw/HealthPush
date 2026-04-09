@@ -164,10 +164,14 @@ final class AppState {
     /// never successfully synced data before. This indicates a likely permissions
     /// issue during initial setup. Once any sync has delivered data, periodic syncs
     /// that find nothing new are expected and do not trigger this warning.
+    ///
+    /// Uses `processedDataPointCount` (total HealthKit results before dedup) rather than
+    /// `dataPointCount` (new/updated after dedup). When HealthKit returned data but dedup
+    /// filtered it all, the sync is working correctly and no warning should be shown.
     var lastSyncHadNoData: Bool {
         guard let lastSyncResult else { return false }
         guard !hasEverSyncedData else { return false }
-        return lastSyncResult.dataPointCount == 0
+        return lastSyncResult.processedDataPointCount == 0
             && lastSyncResult.failedDestinations == 0
             && lastSyncResult.successfulDestinations > 0
     }

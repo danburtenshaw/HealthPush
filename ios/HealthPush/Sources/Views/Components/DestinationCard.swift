@@ -165,42 +165,50 @@ struct DestinationCard: View {
 
     /// A view that shows the sync summary with live-updating relative timestamps.
     /// Uses `Text(date, style: .relative)` so the displayed time updates automatically.
+    ///
+    /// Priority: check `lastSyncedAt` first. If a destination has synced before, always
+    /// show the relative time. Only show "Waiting for first sync" when `lastSyncedAt` is nil.
+    /// This prevents a stale "Initial sync pending" label from lingering when SwiftData
+    /// has not yet propagated the `needsFullSync = false` change through the view hierarchy.
     @ViewBuilder
     private var syncSummaryView: some View {
-        if config.needsFullSync {
-            if config.lastSyncedAt == nil {
-                Text("Initial sync pending")
+        if let lastSyncedAt = config.lastSyncedAt {
+            if config.needsFullSync {
+                // Has synced before but a full re-sync is queued
+                HStack(spacing: 4) {
+                    Text("Re-sync queued")
+                    Text("\u{00B7}")
+                    (Text("last ") + Text(lastSyncedAt, style: .relative) + Text(" ago"))
+                }
+                .accessibilityLabel("Re-sync queued. Last synced \(lastSyncedAt.formatted(date: .abbreviated, time: .shortened))")
             } else {
-                Text("Full re-sync queued")
+                (Text("Last synced ") + Text(lastSyncedAt, style: .relative) + Text(" ago"))
+                    .accessibilityLabel("Last synced \(lastSyncedAt.formatted(date: .abbreviated, time: .shortened))")
             }
-        } else if let lastSyncedAt = config.lastSyncedAt {
-            (Text("Last synced ") + Text(lastSyncedAt, style: .relative) + Text(" ago"))
-                .accessibilityLabel("Last synced \(lastSyncedAt.formatted(date: .abbreviated, time: .shortened))")
         } else {
-            Text("Ready for first sync")
+            Text("Waiting for first sync")
         }
     }
 
     /// Static string version of the sync summary for accessibility labels.
     private var syncSummary: String {
-        if config.needsFullSync {
-            if config.lastSyncedAt == nil {
-                return "Initial sync pending"
-            }
-            return "Full re-sync queued"
-        }
-
         if let lastSyncedAt = config.lastSyncedAt {
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .abbreviated
+            if config.needsFullSync {
+                return "Re-sync queued, last synced \(formatter.localizedString(for: lastSyncedAt, relativeTo: .now))"
+            }
             return "Last synced \(formatter.localizedString(for: lastSyncedAt, relativeTo: .now))"
         }
 
-        return "Ready for first sync"
+        return "Waiting for first sync"
     }
 
     private var syncSummaryColor: Color {
-        config.needsFullSync ? .orange : .secondary
+        if config.lastSyncedAt == nil {
+            return .orange
+        }
+        return config.needsFullSync ? .orange : .secondary
     }
 }
 

@@ -72,6 +72,7 @@ struct AppStateTests {
 
         let result = SyncResult(
             dataPointCount: 10,
+            processedDataPointCount: 10,
             successfulDestinations: 1,
             failedDestinations: 0,
             duration: 1.5,
@@ -90,6 +91,7 @@ struct AppStateTests {
 
         let result = SyncResult(
             dataPointCount: 0,
+            processedDataPointCount: 0,
             successfulDestinations: 0,
             failedDestinations: 1,
             duration: 0.5,
@@ -107,6 +109,7 @@ struct AppStateTests {
 
         let result = SyncResult(
             dataPointCount: 12,
+            processedDataPointCount: 12,
             successfulDestinations: 1,
             failedDestinations: 1,
             duration: 1.2,
@@ -192,6 +195,7 @@ struct AppStateTests {
         state.hasSeenOnboarding = true
         state.recordSyncResult(SyncResult(
             dataPointCount: 5,
+            processedDataPointCount: 5,
             successfulDestinations: 1,
             failedDestinations: 0,
             duration: 1.0,

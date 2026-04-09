@@ -223,6 +223,8 @@ struct NetworkService {
             return try await session.data(for: request)
         } catch let error as URLError {
             switch error.code {
+            case .cancelled:
+                throw NetworkError.connectionFailed("Request was cancelled.")
             case .timedOut:
                 throw NetworkError.timeout
             case .notConnectedToInternet,
