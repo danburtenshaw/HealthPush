@@ -9,6 +9,7 @@ HealthPush is a privacy-first, open-source iOS app and Home Assistant integratio
 | iOS App                         | latest App Store build    | ✅                                                  |
 | iOS App                         | previous minor release    | ✅ for critical issues during a 30-day grace window |
 | Home Assistant Integration      | latest tag + HACS default | ✅                                                  |
+
 Older versions are unsupported. Please reproduce issues on the latest release before reporting.
 
 ## Reporting a Vulnerability

@@ -6,24 +6,24 @@ This document defines the frozen v1 data contract for HealthPush exports. Once a
 
 Each health data record contains the following fields:
 
-| Field                | Type     | Description                                                    |
-|----------------------|----------|----------------------------------------------------------------|
-| `schemaVersion`      | string   | Always `"1.0"` for this contract.                              |
-| `uuid`               | string   | HealthKit sample UUID or deterministic v5 UUID for aggregates. |
-| `metric.key`         | string   | Stable HealthPush key (e.g. `"heart_rate"`), uses `fileStem`.  |
-| `metric.hkIdentifier`| string   | HealthKit type identifier (e.g. `"HKQuantityTypeIdentifierHeartRate"`). |
-| `metric.kind`        | string   | One of `"quantity"`, `"cumulative"`, or `"category"`.          |
-| `value`              | number   | Numeric measurement value.                                     |
-| `unit`               | string   | Canonical unit string (see table below).                       |
-| `startDate`          | string   | ISO 8601 UTC with fractional seconds, trailing `Z`.            |
-| `endDate`            | string   | ISO 8601 UTC with fractional seconds, trailing `Z`.            |
-| `tzOffset`           | string   | Local timezone offset at sample time, formatted `+HH:MM` or `-HH:MM`. |
-| `source.name`        | string   | Source device or app name.                                     |
-| `source.bundleId`    | string   | Source app bundle identifier (may be empty).                   |
-| `aggregation`        | string   | `"raw"` for discrete samples, `"sum"` for cumulative aggregates. |
-| `categoryValue`      | int?     | HealthKit category value (only for category types, null otherwise). |
-| `deleted`            | bool     | `true` if this record is a tombstone marking deletion.         |
-| `deletedAt`          | string?  | ISO 8601 timestamp of deletion (null if not deleted).          |
+| Field | Type | Description |
+|---|---|---|
+| `schemaVersion` | string | Always `"1.0"` for this contract. |
+| `uuid` | string | HealthKit sample UUID or deterministic v5 UUID for aggregates. |
+| `metric.key` | string | Stable HealthPush key (e.g. `"heart_rate"`), uses `fileStem`. |
+| `metric.hkIdentifier` | string | HealthKit type identifier (e.g. `"HKQuantityTypeIdentifierHeartRate"`). |
+| `metric.kind` | string | One of `"quantity"`, `"cumulative"`, or `"category"`. |
+| `value` | number | Numeric measurement value. |
+| `unit` | string | Canonical unit string (see table below). |
+| `startDate` | string | ISO 8601 UTC with fractional seconds, trailing `Z`. |
+| `endDate` | string | ISO 8601 UTC with fractional seconds, trailing `Z`. |
+| `tzOffset` | string | Local timezone offset at sample time, formatted `+HH:MM` or `-HH:MM`. |
+| `source.name` | string | Source device or app name. |
+| `source.bundleId` | string | Source app bundle identifier (may be empty). |
+| `aggregation` | string | `"raw"` for discrete samples, `"sum"` for cumulative aggregates. |
+| `categoryValue` | int? | HealthKit category value (only for category types, null otherwise). |
+| `deleted` | bool | `true` if this record is a tombstone marking deletion. |
+| `deletedAt` | string? | ISO 8601 timestamp of deletion (null if not deleted). |
 
 ## Canonical Units
 
@@ -74,7 +74,7 @@ Each health data record contains the following fields:
 
 Data files are stored in a hierarchical path structure:
 
-```
+```text
 {prefix}/v1/{metric.key}/{YYYY}/{MM}/{DD}/data.jsonl
 {prefix}/v1/{metric.key}/{YYYY}/{MM}/{DD}/_manifest.json
 ```
@@ -98,7 +98,7 @@ Data files are stored in a hierarchical path structure:
 
 When exporting as CSV, the column order is:
 
-```
+```text
 uuid,startDate,endDate,tzOffset,value,unit,aggregation,sourceName,sourceBundleId,schemaVersion
 ```
 
