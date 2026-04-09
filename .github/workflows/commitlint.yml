@@ -17,7 +17,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: commitlint-${{ github.ref }}
+  group: commitlint-${{ github.event.number }}
   cancel-in-progress: true
 
 jobs:

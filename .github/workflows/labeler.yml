@@ -9,7 +9,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: labeler-${{ github.ref }}
+  group: labeler-${{ github.event.number }}
   cancel-in-progress: true
 
 jobs:
