@@ -1,5 +1,5 @@
 {
   "ios/HealthPush": "0.1.0",
-  "integrations/homeassistant/custom_components/healthpush": "0.1.0",
+  "integrations/homeassistant/custom_components/healthpush": "0.1.1",
   "packages/HealthPushStorageCore": "0.1.0"
 }
