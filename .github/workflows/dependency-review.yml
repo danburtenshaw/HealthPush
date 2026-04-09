@@ -28,4 +28,5 @@ jobs:
           comment-summary-in-pr: always
           allow-licenses: >-
             Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MIT,
-            MPL-2.0, PostgreSQL, Python-2.0, Unlicense, 0BSD, CC0-1.0
+            MPL-2.0, PostgreSQL, Python-2.0, Unlicense, 0BSD, CC0-1.0,
+            Ruby, JSON
