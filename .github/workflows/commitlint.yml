@@ -8,12 +8,6 @@ on:
     types: [opened, edited, synchronize, reopened]
 
 permissions:
-  # Minimum required for amannn/action-semantic-pull-request to read the
-  # PR title. The `wip: true` feature is intentionally disabled below
-  # because HealthPush is a public repo, which means GitHub's native
-  # draft PRs cover the WIP use case. Draft PRs don't need a workflow
-  # to post pending statuses, so we avoid the extra `statuses: write`
-  # permission that `wip: true` would otherwise require.
   pull-requests: read
 
 concurrency:
@@ -23,13 +17,6 @@ concurrency:
 jobs:
   lint:
     name: Validate PR title
-    # Bot PRs (Renovate, release-please) already use Conventional Commits
-    # by convention (`chore(deps): update ...`) and run with restricted
-    # tokens that can't always satisfy pull_request_target permission
-    # requirements, so the action errors with "Resource not accessible by
-    # integration". Skip the validator for bot PRs; they're already
-    # well-formed.
-    if: github.actor != 'renovate[bot]' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
