@@ -26,6 +26,7 @@
       "package-name": "ios",
       "component": "ios",
       "release-type": "simple",
+      "pull-request-title-pattern": "chore(ios): release ${version}",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         {
@@ -38,6 +39,7 @@
       "package-name": "ha",
       "component": "ha",
       "release-type": "simple",
+      "pull-request-title-pattern": "chore(ha): release ${version}",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         {
@@ -51,6 +53,7 @@
       "package-name": "storage-core",
       "component": "storage-core",
       "release-type": "simple",
+      "pull-request-title-pattern": "chore(storage-core): release ${version}",
       "changelog-path": "CHANGELOG.md"
     }
   },
