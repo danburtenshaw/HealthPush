@@ -48,7 +48,7 @@ jobs:
       - name: Set up Ruby with Bundler cache
         uses: ruby/setup-ruby@e65c17d16e57e481586a6a5a0282698790062f92 # v1.300.0
         with:
-          ruby-version: "3.3"
+          ruby-version: "3.4.9"
           bundler-cache: true
 
       - name: Select Xcode version
