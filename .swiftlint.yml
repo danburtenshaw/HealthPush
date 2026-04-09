@@ -8,15 +8,12 @@
 included:
   - ios/HealthPush/Sources
   - ios/HealthPush/Tests
-  - packages/HealthPushStorageCore/Sources
-  - packages/HealthPushStorageCore/Tests
 
 excluded:
   - .build
   - .swiftpm
   - DerivedData
   - ios/HealthPush/HealthPush.xcodeproj
-  - packages/HealthPushStorageCore/.build
 
 # ── Disabled defaults (case-by-case) ──────────────────────────────
 disabled_rules:

@@ -49,13 +49,6 @@
         }
       ]
     },
-    "packages/HealthPushStorageCore": {
-      "package-name": "storage-core",
-      "component": "storage-core",
-      "release-type": "simple",
-      "pull-request-title-pattern": "chore(storage-core): release ${version}",
-      "changelog-path": "CHANGELOG.md"
-    }
   },
   "plugins": []
 }

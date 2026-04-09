@@ -184,7 +184,7 @@ Format:
 
 **Valid scopes** (optional but recommended):
 
-`ios`, `ha`, `storage-core`, `destinations`, `sync`, `docs`, `ci`, `deps`, `release`.
+`ios`, `ha`, `destinations`, `sync`, `docs`, `ci`, `deps`, `release`.
 
 **Subject rules:**
 

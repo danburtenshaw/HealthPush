@@ -61,4 +61,4 @@ Apply after:
 
 ## Separate ruleset for release tags
 
-A future `rulesets/tag-protection.json` will handle `ios-v*`, `ha-v*`, and `storage-core-v*` tags with deployment environment gates for App Store submission. It is not included in the initial tooling pass.
+A future `rulesets/tag-protection.json` will handle `ios-v*` and `ha-v*` tags with deployment environment gates for App Store submission. It is not included in the initial tooling pass.

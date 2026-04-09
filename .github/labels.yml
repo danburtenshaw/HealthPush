@@ -50,9 +50,6 @@
 - name: "scope: ha"
   color: "1d76db"
   description: Home Assistant integration
-- name: "scope: storage-core"
-  color: "1d76db"
-  description: packages/HealthPushStorageCore
 - name: "scope: destinations"
   color: "1d76db"
   description: Sync destination abstraction or implementations

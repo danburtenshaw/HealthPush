@@ -21,12 +21,6 @@
           - ".github/workflows/ha-integration-ci.yml"
           - ".github/workflows/release-ha.yml"
 
-"scope: storage-core":
-  - changed-files:
-      - any-glob-to-any-file:
-          - "packages/HealthPushStorageCore/**"
-          - ".github/workflows/s3-core-ci.yml"
-
 "scope: destinations":
   - changed-files:
       - any-glob-to-any-file:
@@ -90,7 +84,6 @@ test:
   - changed-files:
       - any-glob-to-any-file:
           - "ios/HealthPush/Tests/**"
-          - "packages/HealthPushStorageCore/Tests/**"
           - "integrations/homeassistant/tests/**"
 
 ci:
@@ -119,9 +112,7 @@ ci:
           - "ios/HealthPush/Sources/Services/S3Signer.swift"
           - "ios/HealthPush/Sources/Services/S3SyncService.swift"
           - "ios/HealthPush/Sources/Views/Screens/S3SetupScreen.swift"
-          - "packages/HealthPushStorageCore/**"
           - "docs/setup-amazon-s3.mdx"
-          - ".github/workflows/s3-core-ci.yml"
 
 "destination: homeassistant":
   - changed-files:

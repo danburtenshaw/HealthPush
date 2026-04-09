@@ -23,7 +23,6 @@ These areas describe which maintainer is the first reviewer for changes in each 
 | iOS app                        | `ios/HealthPush/`                                | @danburtenshaw   |
 | Fastlane + release automation  | `fastlane/`, `.github/workflows/release-*.yml`   | @danburtenshaw   |
 | Home Assistant integration     | `integrations/homeassistant/`                    | @danburtenshaw   |
-| Storage core package           | `packages/HealthPushStorageCore/`                | @danburtenshaw   |
 | Shared docs + architecture     | `docs/`, `CLAUDE.md`, `AGENTS.md`                | @danburtenshaw   |
 | CI/CD and repo tooling         | `.github/`, `scripts/`, `.lefthook.yml`          | @danburtenshaw   |
 

@@ -18,12 +18,9 @@ Unlimited. These ship with iOS/macOS and have no separate supply chain risk.
 
 Allowlisted by **exact repository URL** in `scripts/check-no-third-party-deps.sh`. These are effectively Apple code shipped as Swift packages. Current members:
 
-| Package                                                       | Role             | Why allowlisted                                                                                                                              |
-| ------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`apple/swift-crypto`](https://github.com/apple/swift-crypto) | `Crypto` library | Used by `HealthPushStorageCore` to provide a stable crypto API across Apple and non-Apple platforms. Apple-maintained. Already in the graph. |
-| [`apple/swift-asn1`](https://github.com/apple/swift-asn1)     | ASN.1 codec      | Transitive dependency of `swift-crypto`. Apple-maintained.                                                                                   |
+No Tier 1 packages are currently in the dependency graph. The iOS app uses `CryptoKit` (Tier 0) directly.
 
-Adding a new Tier 1 package requires updating the allowlist in the check script and this table in the same PR.
+Adding a Tier 1 package requires updating the allowlist in `scripts/check-no-third-party-deps.sh` and this section in the same PR.
 
 Packages that **could** become Tier 1 when and if they're needed (not added pre-emptively):
 
@@ -68,11 +65,6 @@ Proposing a Tier 3 → Tier 2 promotion requires the same process as a new Tier 
 **Zero third-party dependencies of any kind**, including Tier 1. The iOS app target consumes Tier 1 packages only transitively via internal packages under `packages/`.
 
 This is enforced by `scripts/check-no-third-party-deps.sh`, which runs in the `Lint & Guards` workflow on every push and pull request.
-
-## Internal Swift packages (`packages/**`)
-
-- `packages/HealthPushStorageCore/Package.swift`: may depend on Tier 0 and Tier 1 packages only.
-- Any Tier 2 additions require a separate PR through the full process above.
 
 ## Home Assistant integration (`integrations/homeassistant/`)
 

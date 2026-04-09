@@ -37,6 +37,5 @@ cd ios/HealthPush && xcodegen && xcodebuild test \
 This skill runs **only** the iOS tests. For other test suites in the monorepo:
 
 - **Home Assistant integration (Python)**: `cd integrations/homeassistant && python -m pytest`
-- **HealthPushStorageCore (Swift package)**: `cd packages/HealthPushStorageCore && swift test`
 
-Don't conflate them — each has its own CI workflow (`ios-ci.yml`, `ha-integration-ci.yml`, `s3-core-ci.yml`) and failure modes.
+Don't conflate them — each has its own CI workflow (`ios-ci.yml`, `ha-integration-ci.yml`) and failure modes.

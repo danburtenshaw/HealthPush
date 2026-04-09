@@ -1,1 +1,0 @@
-../../../../ios/HealthPush/Sources/Models/HealthDataPoint.swift

@@ -9,8 +9,6 @@ HealthPush is a privacy-first, open-source iOS app and Home Assistant integratio
 | iOS App                         | latest App Store build    | ✅                                                  |
 | iOS App                         | previous minor release    | ✅ for critical issues during a 30-day grace window |
 | Home Assistant Integration      | latest tag + HACS default | ✅                                                  |
-| `HealthPushStorageCore` package | latest tag                | ✅                                                  |
-
 Older versions are unsupported. Please reproduce issues on the latest release before reporting.
 
 ## Reporting a Vulnerability
@@ -63,7 +61,6 @@ If you are unsure whether your activity falls within this safe harbor, please co
 
 - The HealthPush iOS app (sources under `ios/HealthPush/`).
 - The Home Assistant custom integration (`integrations/homeassistant/custom_components/healthpush/`).
-- The `HealthPushStorageCore` Swift package.
 - HealthPush's GitHub Actions workflows under `.github/workflows/` (e.g., insufficient permissions, command injection, supply chain weakness).
 - HealthPush's release artefacts and installation pathways.
 

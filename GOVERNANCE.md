@@ -71,7 +71,7 @@ Existing maintainers nominate and vote on new maintainers by lazy consensus.
 
 - **Conventional Commits** are required for all PR titles — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - **Squash-merge only.** The PR title becomes the commit message on `main`.
-- **Three independent release trains** — iOS, HA integration, and the storage core package — are versioned and released independently. They are never bundled.
+- **Two independent release trains** — iOS and HA integration — are versioned and released independently. They are never bundled.
 - **release-please** opens per-component release PRs automatically based on Conventional Commit history.
 
 ## Security
