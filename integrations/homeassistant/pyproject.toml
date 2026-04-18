@@ -9,7 +9,11 @@ name = "healthpush-ha"
 version = "0.1.0"
 description = "HealthPush Home Assistant custom component"
 readme = "README.md"
-requires-python = ">=3.13.2"
+# Match Home Assistant core's current minimum (HA 2026.x requires >=3.14.2).
+# Bumping this lets uv lock to a single Python branch so transitive deps
+# (aiohttp, cryptography, pyopenssl, etc.) resolve to their patched
+# releases instead of the older versions HA pinned for 3.13.x.
+requires-python = ">=3.14.2"
 license = { text = "MIT" }
 authors = [{ name = "HealthPush Maintainers" }]
 

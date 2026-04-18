@@ -322,7 +322,12 @@ actor HealthKitManager: HealthKitReading {
             anchor: previousAnchor
         )
 
-        let result = try await descriptor.result(for: healthStore)
+        // HKAnchoredObjectQueryDescriptor.Result isn't annotated Sendable in
+        // current iOS SDKs, so awaiting it from this actor trips strict
+        // concurrency under stricter toolchains. We immediately copy the
+        // payload into Sendable HealthDataPoint values, so the unsafe escape
+        // is bounded to this scope.
+        nonisolated(unsafe) let result = try await descriptor.result(for: healthStore)
 
         let dataPoints = result.addedSamples.map { sample in
             HealthDataPoint(
@@ -369,7 +374,8 @@ actor HealthKitManager: HealthKitReading {
             anchor: previousAnchor
         )
 
-        let result = try await descriptor.result(for: healthStore)
+        // See queryAnchoredQuantityMetric for the rationale behind nonisolated(unsafe).
+        nonisolated(unsafe) let result = try await descriptor.result(for: healthStore)
 
         let dataPoints = result.addedSamples.map { sample in
             let durationSeconds = sample.endDate.timeIntervalSince(sample.startDate)
