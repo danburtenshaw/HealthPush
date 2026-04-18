@@ -13,7 +13,9 @@ struct ActivityHeatmapDay: Identifiable {
     let failureCount: Int
 
     /// Total activity count used for intensity bucketing.
-    var total: Int { successCount + failureCount }
+    var total: Int {
+        successCount + failureCount
+    }
 }
 
 // MARK: - ActivityHeatmap
@@ -30,9 +32,9 @@ struct ActivityHeatmap: View {
     let days: [ActivityHeatmapDay]
     /// When set, the caller can react to taps on a specific day (e.g. filter
     /// the log list below). Pass nil for a non-interactive heatmap.
-    var onDayTapped: ((ActivityHeatmapDay) -> Void)? = nil
+    var onDayTapped: ((ActivityHeatmapDay) -> Void)?
     /// Highlighted day (drawn with a ring). Use to reflect external filter state.
-    var selectedDay: Date? = nil
+    var selectedDay: Date?
 
     // MARK: Body
 
@@ -179,7 +181,7 @@ struct ActivityHeatmap: View {
     }
 
     private var activeDayCount: Int {
-        days.filter { $0.total > 0 }.count
+        days.count(where: { $0.total > 0 })
     }
 
     private var accessibilityLabel: String {
@@ -246,12 +248,12 @@ private struct HeatmapCell: View {
     /// Intensity buckets keep the heatmap readable when counts are noisy.
     private func intensity(for count: Int) -> Double {
         switch count {
-        case 0: return 0
-        case 1...3: return 0.25
-        case 4...10: return 0.45
-        case 11...20: return 0.65
-        case 21...35: return 0.85
-        default: return 1.0
+        case 0: 0
+        case 1...3: 0.25
+        case 4...10: 0.45
+        case 11...20: 0.65
+        case 21...35: 0.85
+        default: 1.0
         }
     }
 
@@ -274,7 +276,9 @@ private struct HeatmapCell: View {
 }
 
 private enum StatTone {
-    case accent, error, neutral
+    case accent
+    case error
+    case neutral
 
     var color: Color {
         switch self {

@@ -160,9 +160,13 @@ struct OnboardingScreen: View {
 // MARK: - Step
 
 private enum Step: Int, CaseIterable, Identifiable, Hashable {
-    case flow, permissions, destination
+    case flow
+    case permissions
+    case destination
 
-    var id: Int { rawValue }
+    var id: Int {
+        rawValue
+    }
 
     var next: Step? {
         Step(rawValue: rawValue + 1)
@@ -180,7 +184,7 @@ private struct StepScaffold: View {
     let message: String
     let primaryTitle: String
     let onPrimary: () -> Void
-    var secondary: AnyView? = nil
+    var secondary: AnyView?
 
     var body: some View {
         VStack(spacing: HP.Spacing.xxxl) {
@@ -282,9 +286,18 @@ private struct DataFlowVisual: View {
             // Server LEDs
             let accent = Color.accentColor
             let ledWidth = serverWidth - 24
-            context.fill(RoundedRectangle(cornerRadius: 1).path(in: CGRect(x: serverX + 12, y: serverY + 18, width: ledWidth, height: 6)), with: .color(accent))
-            context.fill(RoundedRectangle(cornerRadius: 1).path(in: CGRect(x: serverX + 12, y: serverY + 32, width: ledWidth, height: 6)), with: .color(Color.white.opacity(0.35)))
-            context.fill(RoundedRectangle(cornerRadius: 1).path(in: CGRect(x: serverX + 12, y: serverY + 46, width: ledWidth - 16, height: 6)), with: .color(Color.white.opacity(0.35)))
+            context.fill(
+                RoundedRectangle(cornerRadius: 1).path(in: CGRect(x: serverX + 12, y: serverY + 18, width: ledWidth, height: 6)),
+                with: .color(accent)
+            )
+            context.fill(
+                RoundedRectangle(cornerRadius: 1).path(in: CGRect(x: serverX + 12, y: serverY + 32, width: ledWidth, height: 6)),
+                with: .color(Color.white.opacity(0.35))
+            )
+            context.fill(
+                RoundedRectangle(cornerRadius: 1).path(in: CGRect(x: serverX + 12, y: serverY + 46, width: ledWidth - 16, height: 6)),
+                with: .color(Color.white.opacity(0.35))
+            )
             let statusDot = Circle().path(in: CGRect(x: serverX + serverWidth - 16, y: serverY + serverHeight - 16, width: 6, height: 6))
             context.fill(statusDot, with: .color(.green))
 
@@ -434,7 +447,11 @@ private struct DestinationTiles: View {
                                 RoundedRectangle(cornerRadius: HP.Radius.card, style: .continuous)
                                     .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
                             }
-                            .shadow(color: .black.opacity(item.featured ? 0.12 : 0), radius: item.featured ? 14 : 0, y: item.featured ? 6 : 0)
+                            .shadow(
+                                color: .black.opacity(item.featured ? 0.12 : 0),
+                                radius: item.featured ? 14 : 0,
+                                y: item.featured ? 6 : 0
+                            )
 
                         Image(systemName: item.systemImage)
                             .font(.system(size: item.featured ? 26 : 20, weight: .semibold))

@@ -382,7 +382,6 @@ struct S3SetupScreen: View {
     // MARK: Helpers
 
     /// A small validation icon shown inline next to form fields.
-    @ViewBuilder
     private func fieldValidationIcon(isValid: Bool) -> some View {
         Image(systemName: isValid ? "checkmark.circle.fill" : "xmark.circle.fill")
             .foregroundStyle(isValid ? .green : .red)
@@ -393,13 +392,13 @@ struct S3SetupScreen: View {
     private var connectionTestAccessibilityLabel: String {
         switch connectionTestState {
         case .idle:
-            return "Test Connection"
+            "Test Connection"
         case .testing:
-            return "Testing connection"
+            "Testing connection"
         case .success:
-            return "Connection test passed"
+            "Connection test passed"
         case let .failure(message):
-            return "Connection test failed: \(message)"
+            "Connection test failed: \(message)"
         }
     }
 

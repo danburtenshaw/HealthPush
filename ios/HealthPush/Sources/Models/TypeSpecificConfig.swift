@@ -11,7 +11,7 @@ enum CredentialField {
 // MARK: - TypeSpecificConfig
 
 /// Destination-specific configuration stored as a JSON blob in DestinationConfig.
-enum TypeSpecificConfig: Codable, Equatable, Sendable {
+enum TypeSpecificConfig: Codable, Equatable {
     case homeAssistant(HomeAssistantTypeConfig)
     case s3(S3TypeConfig)
 
@@ -29,9 +29,9 @@ enum TypeSpecificConfig: Codable, Equatable, Sendable {
         let type = try container.decode(TypeDiscriminator.self, forKey: .type)
         switch type {
         case .homeAssistant:
-            self = .homeAssistant(try HomeAssistantTypeConfig(from: decoder))
+            self = try .homeAssistant(HomeAssistantTypeConfig(from: decoder))
         case .s3:
-            self = .s3(try S3TypeConfig(from: decoder))
+            self = try .s3(S3TypeConfig(from: decoder))
         }
     }
 
@@ -50,13 +50,13 @@ enum TypeSpecificConfig: Codable, Equatable, Sendable {
 
 // MARK: - HomeAssistantTypeConfig
 
-struct HomeAssistantTypeConfig: Codable, Equatable, Sendable {
+struct HomeAssistantTypeConfig: Codable, Equatable {
     var webhookURL: String
 }
 
 // MARK: - S3TypeConfig
 
-struct S3TypeConfig: Codable, Equatable, Sendable {
+struct S3TypeConfig: Codable, Equatable {
     var bucket: String
     var region: String
     var endpoint: String

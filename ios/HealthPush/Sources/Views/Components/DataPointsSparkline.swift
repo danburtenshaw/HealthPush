@@ -149,7 +149,7 @@ struct DataPointsSparkline: View {
     }
 
     private var accessibilityLabel: String {
-        var parts: [String] = ["\(todayValue) data points synced today."]
+        var parts = ["\(todayValue) data points synced today."]
         if let delta = percentVsAverage {
             parts.append("\(delta >= 0 ? "Up" : "Down") \(abs(delta)) percent versus the weekly average.")
         }

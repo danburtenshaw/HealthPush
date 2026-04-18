@@ -277,9 +277,11 @@ struct SyncHistoryScreen: View {
         for record in syncRecords {
             let day = calendar.startOfDay(for: record.timestamp)
             switch record.status {
-            case .success, .deferred:
+            case .success,
+                 .deferred:
                 successByDay[day, default: 0] += 1
-            case .failure, .partialFailure:
+            case .failure,
+                 .partialFailure:
                 failureByDay[day, default: 0] += 1
             case .inProgress:
                 continue

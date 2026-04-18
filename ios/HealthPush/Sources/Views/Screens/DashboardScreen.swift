@@ -584,7 +584,8 @@ struct DashboardScreen: View {
         var failing: Set<UUID> = []
         for destination in enabled {
             if let latest = allSyncs.first(where: { $0.destinationID == destination.id }),
-               latest.status == .failure || latest.status == .partialFailure {
+               latest.status == .failure || latest.status == .partialFailure
+            {
                 failing.insert(destination.id)
             }
         }

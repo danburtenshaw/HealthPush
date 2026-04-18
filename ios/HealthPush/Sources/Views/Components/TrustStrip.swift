@@ -56,7 +56,6 @@ struct TrustStrip: View {
 
     // MARK: Cells
 
-    @ViewBuilder
     private func cell(label: String, dot: DotStyle? = nil, icon: String? = nil, value: String) -> some View {
         VStack(alignment: .leading, spacing: HP.Spacing.sm) {
             Text(label.uppercased())
@@ -140,7 +139,10 @@ struct TrustStrip: View {
 // MARK: - StatusDot
 
 enum DotStyle {
-    case success, failure, active, idle
+    case success
+    case failure
+    case active
+    case idle
 
     var color: Color {
         switch self {
@@ -156,7 +158,7 @@ enum DotStyle {
 /// the system is actively doing work.
 struct StatusDot: View {
     let style: DotStyle
-    var pulsing: Bool = false
+    var pulsing = false
     var size: CGFloat = 7
 
     var body: some View {

@@ -74,7 +74,8 @@ struct HealthDataExporterTests {
 
     @Test("CSV header matches v1 schema column order")
     func csvHeaderMatchesV1() {
-        #expect(HealthDataExporter.csvHeader == "uuid,startDate,endDate,tzOffset,value,unit,aggregation,sourceName,sourceBundleId,schemaVersion")
+        #expect(HealthDataExporter
+            .csvHeader == "uuid,startDate,endDate,tzOffset,value,unit,aggregation,sourceName,sourceBundleId,schemaVersion")
     }
 
     // MARK: JSON Round-Trip

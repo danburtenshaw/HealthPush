@@ -193,7 +193,7 @@ struct DestinationCard: View {
                 HStack(spacing: 4) {
                     Text("Re-sync queued")
                     Text("\u{00B7}")
-                    (Text("last ") + Text(lastSyncedAt, style: .relative) + Text(" ago"))
+                    Text("last ") + Text(lastSyncedAt, style: .relative) + Text(" ago")
                 }
                 .accessibilityLabel("Re-sync queued. Last synced \(lastSyncedAt.formatted(date: .abbreviated, time: .shortened))")
             } else {
