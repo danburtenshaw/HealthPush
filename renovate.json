@@ -6,6 +6,16 @@
     "schedule:weekly"
   ],
   "labels": ["dependencies"],
+  "minimumReleaseAge": "3 days",
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 2,
+  "rebaseWhen": "conflicted",
+  "vulnerabilityAlerts": {
+    "labels": ["dependencies", "security"],
+    "groupName": "security updates",
+    "minimumReleaseAge": "0 days",
+    "schedule": ["at any time"]
+  },
   "packageRules": [
     {
       "matchManagers": ["pip_requirements", "pip-compile", "pep621"],

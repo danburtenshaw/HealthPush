@@ -1,12 +1,13 @@
 # HealthPush Home Assistant integration — dev tooling (source file)
 # Keep in sync with pyproject.toml configuration.
 #
-# This is the human-edited source. The hash-pinned lockfile
+# This is the human-edited source. The pinned lockfile
 # (requirements_dev.txt) is what CI installs. Regenerate after edits:
-#   uv pip compile requirements_dev.in --generate-hashes --universal \
-#     --python-version 3.14 --output-file requirements_dev.txt
+#   uv pip compile requirements_dev.in --python-version 3.14.2 \
+#     --output-file requirements_dev.txt
 #
-# Renovate bumps pinned versions in the .txt lockfile automatically.
+# Transitive pins live in the .txt; hashes are not used here because these
+# are dev/CI tools (no production exposure). Renovate keeps pins current.
 
 ruff==0.15.9
 mypy==1.20.0
