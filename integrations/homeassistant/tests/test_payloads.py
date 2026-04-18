@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from pathlib import Path
 import sys
 import unittest
@@ -154,11 +153,7 @@ class PayloadTests(unittest.TestCase):
     # ── Y9: Metric count capped at 100 ──────────────────────────────
 
     def test_metrics_capped_at_100(self) -> None:
-        payload = {
-            "metrics": [
-                {"type": f"metric_{i}", "value": i} for i in range(150)
-            ]
-        }
+        payload = {"metrics": [{"type": f"metric_{i}", "value": i} for i in range(150)]}
 
         valid = extract_valid_metrics(payload)
 
@@ -167,11 +162,7 @@ class PayloadTests(unittest.TestCase):
         assert valid[-1]["value"] == 99
 
     def test_exactly_100_metrics_accepted(self) -> None:
-        payload = {
-            "metrics": [
-                {"type": f"metric_{i}", "value": i} for i in range(100)
-            ]
-        }
+        payload = {"metrics": [{"type": f"metric_{i}", "value": i} for i in range(100)]}
 
         valid = extract_valid_metrics(payload)
         assert len(valid) == 100
