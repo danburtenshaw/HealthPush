@@ -1,1 +1,0 @@
-pytest>=9.0.3  # GHSA-6w46-j5rx-g56g: vulnerable tmpdir handling fixed in 9.0.3

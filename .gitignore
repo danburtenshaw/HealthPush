@@ -68,4 +68,3 @@ coverage.xml
 
 # Local
 .local/
-integrations/homeassistant/uv.lock

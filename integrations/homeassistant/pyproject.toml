@@ -9,9 +9,37 @@ name = "healthpush-ha"
 version = "0.1.0"
 description = "HealthPush Home Assistant custom component"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13.2"
 license = { text = "MIT" }
 authors = [{ name = "HealthPush Maintainers" }]
+
+# The custom component itself has no pip-installable runtime deps — it runs
+# inside a user's Home Assistant instance and uses HA's own packages. These
+# groups are CI-only tooling.
+#
+# homeassistant is installed so mypy can see real HA types at the
+# boundary (ConfigFlow, HomeAssistant, etc.). The alternative — dropping
+# it and using ignore_missing_imports — works for repos that minimize
+# HA boundary exposure, but HealthPush extends HA classes in ~4 files.
+# This matches bramstroker/homeassistant-powercalc. Renovate's uv
+# manager distinguishes direct vs transitive deps in uv.lock, so HA's
+# transitive tree doesn't generate major-bump PR noise.
+#
+# Regenerate uv.lock after editing:   uv lock
+
+[dependency-groups]
+dev = [
+  "ruff>=0.15.0",
+  "mypy>=1.20.0",
+  "bandit[toml]>=1.9.0",
+  "homeassistant>=2026.1.3",
+]
+test = [
+  # pytest>=9.0.3 closes GHSA-6w46-j5rx-g56g (tmpdir handling)
+  "pytest>=9.0.3",
+  "pytest-cov>=7.0.0",
+  "pytest-asyncio>=1.3.0",
+]
 
 # ──────────────────────────────────────────────────────────────────────
 # ruff — mirror Home Assistant core's ruleset as closely as is sensible

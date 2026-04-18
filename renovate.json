@@ -18,8 +18,14 @@
   },
   "packageRules": [
     {
-      "matchManagers": ["pip_requirements", "pip-compile", "pep621"],
+      "matchManagers": ["pep621", "uv"],
       "addLabels": ["python"]
+    },
+    {
+      "matchManagers": ["pep621", "uv"],
+      "matchDepTypes": ["indirect"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
     },
     {
       "matchManagers": ["swift"],

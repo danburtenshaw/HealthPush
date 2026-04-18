@@ -137,27 +137,21 @@ cp -r integrations/homeassistant/custom_components/healthpush \
   ~/.homeassistant/custom_components/
 ```
 
-#### Regenerating Python lockfiles
+#### Python dependencies (HA integration)
 
-The HA integration uses `pip-compile`-style lockfiles managed via [`uv`](https://docs.astral.sh/uv/). The `.in` files are the human-edited source; the `.txt` files are generated and checked in.
+Dev/test deps are declared in `integrations/homeassistant/pyproject.toml` under `[dependency-groups]` (PEP 735). The lockfile is `uv.lock`, managed by [`uv`](https://docs.astral.sh/uv/). CI runs `uv sync --locked --group dev --group test`. This matches the modern Python + HACS pattern used by `bramstroker/homeassistant-powercalc`, `frenck/spook`, and `basnijholt/adaptive-lighting`.
 
-- `integrations/homeassistant/requirements_dev.in` — HA + dev tooling source. CI runs Linux, but `homeassistant` pulls `bleak` which has macOS-only `pyobjc-*` transitives when compiled on darwin. **Always pass `--python-platform x86_64-unknown-linux-gnu`**, otherwise CI fails with `PyObjC requires macOS to build`:
+To install locally:
 
-  ```bash
-  uv pip compile integrations/homeassistant/requirements_dev.in \
-    --python-version 3.14.2 \
-    --python-platform x86_64-unknown-linux-gnu \
-    --output-file integrations/homeassistant/requirements_dev.txt
-  ```
+```bash
+cd integrations/homeassistant
+uv sync --group dev --group test
+uv run pytest   # or ruff, mypy, bandit — all via `uv run`
+```
 
-- `integrations/homeassistant/requirements_test.in` (hash-pinned) and `.github/requirements/yamllint.in` (hash-pinned) — pure-Python trees, no platform flag needed. Regenerate with `--generate-hashes`:
+To add/remove a direct dep: edit `pyproject.toml`, then run `uv lock`. Renovate keeps transitive pins in `uv.lock` current automatically via the `uv` manager (and correctly distinguishes direct vs indirect deps, so transitive major bumps don't generate PRs).
 
-  ```bash
-  uv pip compile <file>.in --generate-hashes --python-version 3.14.2 \
-    --output-file <file>.txt
-  ```
-
-Renovate keeps all three `.txt` lockfiles current automatically; manual regeneration is only needed when adding, removing, or upgrading direct deps in the `.in` files.
+The repo-level `yamllint` install in `lint.yml` uses its own hash-pinned `.github/requirements/yamllint.txt` lockfile, regenerated via `uv pip compile --generate-hashes` when the `.in` changes.
 
 ### Running Tests
 
