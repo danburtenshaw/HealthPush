@@ -1,6 +1,7 @@
 import BackgroundTasks
 import Foundation
 import os
+import UIKit
 
 // MARK: - BackgroundSyncScheduler
 
@@ -56,10 +57,14 @@ final class BackgroundSyncScheduler {
     /// Reports `isProtectedDataAvailable` and notifies on unlock.
     private let protectedDataMonitor: any ProtectedDataMonitoring
 
-    /// The callback that performs the actual sync work. The first param is the
-    /// deadline (or nil for foreground/observer syncs that don't have a hard
-    /// budget). The second is `isBackground`.
-    private var syncHandler: (@Sendable (Date?) async -> Bool)?
+    /// The callback that performs the actual sync work.
+    /// - `deadline`: cutoff for the run, or nil for observer syncs that have no
+    ///   hard budget.
+    /// - `isBackground`: whether the app was actually in the background when the
+    ///   sync started. BGProcessingTask is always true; observer syncs check
+    ///   `UIApplication.applicationState` at sync time so a sync triggered by
+    ///   opening the app is tagged foreground.
+    private var syncHandler: (@Sendable (_ deadline: Date?, _ isBackground: Bool) async -> Bool)?
 
     /// Debounce task for observer-triggered syncs.
     private var pendingObserverSync: Task<Void, Never>?
@@ -120,10 +125,12 @@ final class BackgroundSyncScheduler {
 
     /// Registers background task handlers with the system.
     /// Must be called before the end of `application(_:didFinishLaunchingWithOptions:)`.
-    /// - Parameter handler: An async closure that performs the sync. Receives an
-    ///   optional `deadline` (the BGTask's estimated end time) and returns
-    ///   whether the run completed successfully.
-    func registerTasks(syncHandler: @escaping @Sendable (Date?) async -> Bool) {
+    /// - Parameter syncHandler: An async closure that performs the sync. Receives
+    ///   the optional `deadline` (the BGTask's estimated end time) and
+    ///   `isBackground` (true when iOS actually woke the app in the background;
+    ///   false when the observer fired while the app was open). Returns whether
+    ///   the run completed successfully.
+    func registerTasks(syncHandler: @escaping @Sendable (_ deadline: Date?, _ isBackground: Bool) async -> Bool) {
         self.syncHandler = syncHandler
 
         BGTaskScheduler.shared.register(
@@ -246,10 +253,14 @@ final class BackgroundSyncScheduler {
                 return
             }
 
-            logger.info("Observer-triggered sync starting (debounced)")
+            // Check application state at the moment the sync actually starts,
+            // not when the observer fired — the app could have backgrounded
+            // during the debounce window.
+            let runningInBackground = UIApplication.shared.applicationState == .background
+            logger.info("Observer-triggered sync starting (debounced, background: \(runningInBackground))")
             isSyncing = true
             // Observer syncs have no hard deadline; pass nil.
-            let success = await syncHandler?(nil) ?? false
+            let success = await syncHandler?(nil, runningInBackground) ?? false
             isSyncing = false
             logger.info("Observer-triggered sync completed with success: \(success)")
         }
@@ -298,7 +309,8 @@ final class BackgroundSyncScheduler {
 
         isSyncing = true
         let syncTask = Task { [weak self] () -> Bool in
-            await self?.syncHandler?(deadline) ?? false
+            // BGProcessingTask always runs with the app in the background.
+            await self?.syncHandler?(deadline, true) ?? false
         }
 
         task.expirationHandler = {

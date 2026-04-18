@@ -149,6 +149,17 @@ struct HomeAssistantDestination: SyncDestination {
             onProgress?(1, 1)
             logger.info("Home Assistant webhook sync complete: \(metrics.count) metrics sent")
         } catch {
+            // Preserve URLError.cancelled and CancellationError so
+            // SyncFailure.classifyNetworkError can mark them deferred(.outOfTime).
+            // Wrapping them in HomeAssistantError.syncFailed would have lost the type.
+            if let urlError = error as? URLError, urlError.code == .cancelled {
+                logger.info("Webhook sync cancelled: \(error.localizedDescription)")
+                throw error
+            }
+            if error is CancellationError {
+                logger.info("Webhook sync cancelled")
+                throw error
+            }
             logger.error("Webhook sync failed: \(error.localizedDescription)")
             throw HomeAssistantError.syncFailed(error.localizedDescription)
         }

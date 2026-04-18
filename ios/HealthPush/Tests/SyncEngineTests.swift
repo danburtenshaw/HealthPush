@@ -481,8 +481,8 @@ struct SyncEngineTests {
         #expect(result.processedDataPointCount >= result.dataPointCount)
     }
 
-    @Test("Background mode skips recently synced destinations")
-    func backgroundSkipsRecentlySynced() async throws {
+    @Test("Automatic sync skips recently synced destinations")
+    func automaticSyncSkipsRecentlySynced() async throws {
         let container = try makeModelContainer()
         let context = ModelContext(container)
 
@@ -505,8 +505,8 @@ struct SyncEngineTests {
             networkService: makeStubNetworkService()
         )
 
-        // Background sync should skip this destination because it was synced recently
-        let result = await engine.performSync(modelContext: context, isBackground: true)
+        // Automatic sync should skip this destination because it was synced recently
+        let result = await engine.performSync(modelContext: context, isAutomatic: true)
 
         #expect(result.dataPointCount == 0)
         #expect(result.successfulDestinations == 0)
@@ -548,8 +548,8 @@ struct SyncEngineTests {
             networkService: makeStubNetworkService()
         )
 
-        // Manual sync (isBackground: false) should always run
-        let result = await engine.performSync(modelContext: context, isBackground: false)
+        // Manual sync (isAutomatic: false) should always run
+        let result = await engine.performSync(modelContext: context, isAutomatic: false)
 
         #expect(fakeReader.queryDataCallCount >= 1)
         #expect(result.successfulDestinations == 1)

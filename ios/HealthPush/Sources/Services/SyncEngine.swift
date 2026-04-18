@@ -144,20 +144,28 @@ final class SyncEngine {
     /// Performs a full sync for all enabled destinations.
     /// - Parameters:
     ///   - modelContext: The SwiftData model context for persistence.
-    ///   - isBackground: Whether this is a background sync.
+    ///   - isAutomatic: Whether this sync was triggered automatically (BGTask or
+    ///     HKObserverQuery) rather than by an explicit user action. Automatic
+    ///     syncs respect each destination's frequency gate; manual "Sync Now"
+    ///     always syncs everything.
+    ///   - isBackground: Whether the app was actually in the background when the
+    ///     sync started. Used only for tagging the `SyncRecord` so logs
+    ///     distinguish real iOS-wake syncs from observer syncs that happened
+    ///     while the app was open.
     ///   - deadline: Optional cutoff time. When set, the engine checks remaining
     ///     time between destinations and defers any unstarted work, marking it
     ///     `.deferred(.outOfTime, ...)` instead of attempting it under a doomed budget.
     ///   - onProgress: Per-destination progress callback (name, fractionComplete).
     func performSync(
         modelContext: ModelContext,
+        isAutomatic: Bool = false,
         isBackground: Bool = false,
         deadline: Date? = nil,
         onProgress: ProgressHandler? = nil
     ) async -> SyncResult {
         let syncState = signposter.beginInterval("performSync")
         let startTime = Date()
-        logger.info("Starting sync (background: \(isBackground))")
+        logger.info("Starting sync (automatic: \(isAutomatic), background: \(isBackground))")
 
         // Fetch enabled destination configs
         let descriptor = FetchDescriptor<DestinationConfig>(
@@ -206,6 +214,7 @@ final class SyncEngine {
             return makeDeferredResult(
                 for: destinations,
                 modelContext: modelContext,
+                isAutomatic: isAutomatic,
                 isBackground: isBackground,
                 reason: .offline,
                 message: "No network connection — will retry when online.",
@@ -228,9 +237,9 @@ final class SyncEngine {
                 continue
             }
 
-            // In background mode, skip destinations that were synced recently enough
+            // Automatic syncs skip destinations that were synced recently enough
             // per their own frequency. Manual "Sync Now" always syncs everything.
-            if isBackground,
+            if isAutomatic,
                !config.needsFullSync,
                let lastSynced = config.lastSyncedAt,
                Date.now.timeIntervalSince(lastSynced) < config.syncFrequency.timeInterval * 0.9
@@ -642,6 +651,7 @@ final class SyncEngine {
     private func makeDeferredResult(
         for destinations: [DestinationConfig],
         modelContext: ModelContext,
+        isAutomatic: Bool,
         isBackground: Bool,
         reason: SyncFailure.DeferReason,
         message: String,
@@ -651,8 +661,8 @@ final class SyncEngine {
         var errors: [SyncDestinationError] = []
 
         for config in destinations where !config.enabledMetrics.isEmpty {
-            // Background mode skips recently-synced destinations entirely.
-            if isBackground,
+            // Automatic syncs skip recently-synced destinations entirely.
+            if isAutomatic,
                !config.needsFullSync,
                let lastSynced = config.lastSyncedAt,
                Date.now.timeIntervalSince(lastSynced) < config.syncFrequency.timeInterval * 0.9

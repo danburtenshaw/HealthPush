@@ -142,7 +142,15 @@ struct DashboardScreen: View {
                 }
             }
             .refreshable {
-                await performSync()
+                // SwiftUI cancels the .refreshable task when view state thrash
+                // (dynamic safeAreaInset, state-driven layout changes) invalidates
+                // the refresh context. That cancellation propagates into
+                // URLSession.data(for:) and aborts uploads mid-flight with
+                // URLError.cancelled. Running performSync in an unstructured
+                // child Task detaches it from refresh cancellation; awaiting
+                // .value keeps the refresh spinner visible until the sync
+                // actually finishes.
+                await Task { await performSync() }.value
             }
             .onChange(of: activeNudge) {
                 // Reset dismissal when the nudge kind changes

@@ -293,7 +293,11 @@ struct S3Client {
         } catch let error as URLError {
             switch error.code {
             case .cancelled:
-                throw S3Error.connectionFailed("Request was cancelled")
+                // Re-throw the raw URLError so SyncFailure.classifyNetworkError
+                // can classify it as .deferred(.outOfTime) instead of a hard
+                // failure. Wrapping the cancellation in S3Error hid it behind
+                // the .connectionFailed string and broke classification.
+                throw error
             case .timedOut:
                 throw S3Error.connectionFailed("Request timed out")
             case .notConnectedToInternet,

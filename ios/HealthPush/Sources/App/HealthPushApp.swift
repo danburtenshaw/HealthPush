@@ -67,14 +67,15 @@ struct HealthPushApp: App {
         let appState = appState
         let destinationManager = destinationManager
         let syncEngine = syncEngine
-        BackgroundSyncScheduler.shared.registerTasks { @MainActor (deadline: Date?) -> Bool in
+        BackgroundSyncScheduler.shared.registerTasks { @MainActor (deadline: Date?, isBackground: Bool) -> Bool in
             // Use the main context so SwiftData changes (lastSyncedAt, needsFullSync)
             // are visible to the UI immediately. Using a separate ModelContext would
             // cause the dashboard to show stale data until the contexts merge.
             let context = container.mainContext
             let result = await syncEngine.performSync(
                 modelContext: context,
-                isBackground: true,
+                isAutomatic: true,
+                isBackground: isBackground,
                 deadline: deadline
             )
             appState.recordSyncResult(result)
