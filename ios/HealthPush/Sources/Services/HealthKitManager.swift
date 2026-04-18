@@ -96,25 +96,42 @@ actor HealthKitManager: HealthKitReading {
 
     // MARK: Queries
 
-    /// Queries health data for the given metrics within a date range.
-    /// - Parameters:
-    ///   - metrics: The health metrics to query.
-    ///   - start: The start of the date range.
-    ///   - end: The end of the date range.
-    /// - Returns: An array of health data points.
+    /// Queries discrete metrics using HKAnchoredObjectQuery.
+    ///
+    /// When an anchor is present for a metric, only samples added/modified in
+    /// HealthKit since that anchor are returned — regardless of the sample's
+    /// own start/end date. This correctly captures late-arriving Apple Watch
+    /// data because anchors track database insertion order, not sample
+    /// timestamps.
+    ///
+    /// When no anchor is present (first sync after install/reset), the
+    /// `fallbackStart` window is used, and a fresh anchor is returned for the
+    /// caller to persist after a successful destination delivery.
     func queryData(
         for metrics: Set<HealthMetricType>,
-        from start: Date,
-        to end: Date
-    ) async -> HealthDataQueryResult {
+        anchors: [HealthMetricType: Data],
+        fallbackStart: Date,
+        end: Date
+    ) async -> HealthAnchoredQueryResult {
         let state = signposter.beginInterval("queryData")
         var allDataPoints: [HealthDataPoint] = []
         var issues: [HealthMetricQueryIssue] = []
+        var newAnchors: [HealthMetricType: Data] = [:]
 
         for metric in metrics {
             do {
-                let points = try await querySingleMetric(metric, from: start, to: end)
-                allDataPoints.append(contentsOf: points)
+                let storedAnchor = try anchors[metric].flatMap { try MetricSyncAnchor.decode($0) }
+                let result = try await queryAnchoredMetric(
+                    metric,
+                    previousAnchor: storedAnchor,
+                    fallbackStart: fallbackStart,
+                    end: end
+                )
+                allDataPoints.append(contentsOf: result.dataPoints)
+                if let nextAnchor = result.newAnchor {
+                    let encoded = try MetricSyncAnchor.encode(nextAnchor)
+                    newAnchors[metric] = encoded
+                }
             } catch {
                 logger.warning("Failed to query \(metric.rawValue): \(error.localizedDescription)")
                 issues.append(HealthMetricQueryIssue(
@@ -125,7 +142,11 @@ actor HealthKitManager: HealthKitReading {
         }
 
         signposter.endInterval("queryData", state)
-        return HealthDataQueryResult(dataPoints: allDataPoints, issues: issues)
+        return HealthAnchoredQueryResult(
+            dataPoints: allDataPoints,
+            issues: issues,
+            newAnchors: newAnchors
+        )
     }
 
     /// Queries daily aggregated statistics for cumulative metrics.
@@ -252,42 +273,58 @@ actor HealthKitManager: HealthKitReading {
         }
     }
 
-    private func querySingleMetric(
+    /// Single-metric anchored query result, internal to the manager.
+    private struct AnchoredMetricResult {
+        let dataPoints: [HealthDataPoint]
+        let newAnchor: HKQueryAnchor?
+    }
+
+    private func queryAnchoredMetric(
         _ metric: HealthMetricType,
-        from start: Date,
-        to end: Date
-    ) async throws -> [HealthDataPoint] {
+        previousAnchor: HKQueryAnchor?,
+        fallbackStart: Date,
+        end: Date
+    ) async throws -> AnchoredMetricResult {
         if metric.isCategoryType {
-            try await queryCategoryMetric(metric, from: start, to: end)
+            try await queryAnchoredCategoryMetric(metric, previousAnchor: previousAnchor, fallbackStart: fallbackStart, end: end)
         } else {
-            try await queryQuantityMetric(metric, from: start, to: end)
+            try await queryAnchoredQuantityMetric(metric, previousAnchor: previousAnchor, fallbackStart: fallbackStart, end: end)
         }
     }
 
-    private func queryQuantityMetric(
+    private func queryAnchoredQuantityMetric(
         _ metric: HealthMetricType,
-        from start: Date,
-        to end: Date
-    ) async throws -> [HealthDataPoint] {
+        previousAnchor: HKQueryAnchor?,
+        fallbackStart: Date,
+        end: Date
+    ) async throws -> AnchoredMetricResult {
         guard let quantityType = metric.hkQuantityType, let unit = metric.hkUnit else {
             throw HealthKitError.invalidType(metric.rawValue)
         }
 
-        let predicate = HKQuery.predicateForSamples(
-            withStart: start,
-            end: end,
-            options: .strictStartDate
+        // No date predicate when an anchor exists — we want every newly inserted
+        // sample regardless of its timestamp, which is how late-arriving Watch
+        // backfills get caught. The fallback window only applies on first sync.
+        let predicate: HKSamplePredicate<HKQuantitySample>
+        if previousAnchor == nil {
+            let datePredicate = HKQuery.predicateForSamples(
+                withStart: fallbackStart,
+                end: end,
+                options: .strictStartDate
+            )
+            predicate = .quantitySample(type: quantityType, predicate: datePredicate)
+        } else {
+            predicate = .quantitySample(type: quantityType)
+        }
+
+        let descriptor = HKAnchoredObjectQueryDescriptor(
+            predicates: [predicate],
+            anchor: previousAnchor
         )
 
-        let descriptor = HKSampleQueryDescriptor(
-            predicates: [.quantitySample(type: quantityType, predicate: predicate)],
-            sortDescriptors: [SortDescriptor(\.startDate, order: .reverse)],
-            limit: HKObjectQueryNoLimit
-        )
+        let result = try await descriptor.result(for: healthStore)
 
-        let samples = try await descriptor.result(for: healthStore)
-
-        return samples.map { sample in
+        let dataPoints = result.addedSamples.map { sample in
             HealthDataPoint(
                 id: sample.uuid,
                 metricType: metric,
@@ -301,32 +338,40 @@ actor HealthKitManager: HealthKitReading {
                 aggregation: "raw"
             )
         }
+
+        return AnchoredMetricResult(dataPoints: dataPoints, newAnchor: result.newAnchor)
     }
 
-    private func queryCategoryMetric(
+    private func queryAnchoredCategoryMetric(
         _ metric: HealthMetricType,
-        from start: Date,
-        to end: Date
-    ) async throws -> [HealthDataPoint] {
+        previousAnchor: HKQueryAnchor?,
+        fallbackStart: Date,
+        end: Date
+    ) async throws -> AnchoredMetricResult {
         guard let categoryType = metric.hkCategoryType else {
             throw HealthKitError.invalidType(metric.rawValue)
         }
 
-        let predicate = HKQuery.predicateForSamples(
-            withStart: start,
-            end: end,
-            options: .strictStartDate
+        let predicate: HKSamplePredicate<HKCategorySample>
+        if previousAnchor == nil {
+            let datePredicate = HKQuery.predicateForSamples(
+                withStart: fallbackStart,
+                end: end,
+                options: .strictStartDate
+            )
+            predicate = .categorySample(type: categoryType, predicate: datePredicate)
+        } else {
+            predicate = .categorySample(type: categoryType)
+        }
+
+        let descriptor = HKAnchoredObjectQueryDescriptor(
+            predicates: [predicate],
+            anchor: previousAnchor
         )
 
-        let descriptor = HKSampleQueryDescriptor(
-            predicates: [.categorySample(type: categoryType, predicate: predicate)],
-            sortDescriptors: [SortDescriptor(\.startDate, order: .reverse)],
-            limit: HKObjectQueryNoLimit
-        )
+        let result = try await descriptor.result(for: healthStore)
 
-        let samples = try await descriptor.result(for: healthStore)
-
-        return samples.map { sample in
+        let dataPoints = result.addedSamples.map { sample in
             let durationSeconds = sample.endDate.timeIntervalSince(sample.startDate)
             return HealthDataPoint(
                 id: sample.uuid,
@@ -341,6 +386,8 @@ actor HealthKitManager: HealthKitReading {
                 aggregation: "raw"
             )
         }
+
+        return AnchoredMetricResult(dataPoints: dataPoints, newAnchor: result.newAnchor)
     }
 
     // MARK: Background Delivery
@@ -407,11 +454,5 @@ actor HealthKitManager: HealthKitReading {
             healthStore.stop(query)
         }
         observerQueries.removeAll()
-    }
-
-    /// Resets stored sync state (clears anchor data from UserDefaults).
-    func resetAnchors() {
-        UserDefaults.standard.removeObject(forKey: "healthkit_anchors")
-        logger.info("HealthKit sync state reset")
     }
 }

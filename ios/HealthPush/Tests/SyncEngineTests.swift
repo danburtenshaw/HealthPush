@@ -6,13 +6,13 @@ import Testing
 // MARK: - SyncEngineTests
 
 @MainActor
-@Suite("SyncEngine orchestration", .serialized)
+@Suite(.serialized)
 struct SyncEngineTests {
     // MARK: Helpers
 
     /// Creates an in-memory SwiftData container suitable for testing.
     private func makeModelContainer() throws -> ModelContainer {
-        let schema = Schema([DestinationConfig.self, SyncRecord.self])
+        let schema = Schema([DestinationConfig.self, SyncRecord.self, MetricSyncAnchor.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -69,7 +69,7 @@ struct SyncEngineTests {
         defer { try? config.deleteAllCredentials() }
 
         let fakeReader = FakeHealthKitReader()
-        fakeReader.queryDataResult = HealthDataQueryResult(
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
             dataPoints: [makeHeartRatePoint()],
             issues: []
         )
@@ -155,7 +155,7 @@ struct SyncEngineTests {
         try context.save()
 
         let fakeReader = FakeHealthKitReader()
-        fakeReader.queryDataResult = HealthDataQueryResult(
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
             dataPoints: [makeHeartRatePoint()],
             issues: []
         )
@@ -182,7 +182,7 @@ struct SyncEngineTests {
         defer { try? config.deleteAllCredentials() }
 
         let fakeReader = FakeHealthKitReader()
-        fakeReader.queryDataResult = HealthDataQueryResult(
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
             dataPoints: [makeHeartRatePoint()],
             issues: []
         )
@@ -213,13 +213,32 @@ struct SyncEngineTests {
         #expect(fakeReader.requestAuthCallCount == 1)
     }
 
-    @Test("resetAnchors delegates to reader")
-    func resetAnchorsDelegatesToReader() async {
-        let fakeReader = FakeHealthKitReader()
-        let engine = SyncEngine(healthKitReader: fakeReader)
+    @Test("resetAnchors clears stored anchors and forces full re-sync")
+    func resetAnchorsClearsStoredAnchors() throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
 
-        await engine.resetAnchors()
-        #expect(fakeReader.resetAnchorsCallCount == 1)
+        let config = try insertHAConfig(into: context)
+        defer { try? config.deleteAllCredentials() }
+
+        // Seed an anchor record and mark the destination as already-synced.
+        let seededAnchor = MetricSyncAnchor(
+            destinationID: config.id,
+            metric: .heartRate,
+            anchorData: Data([0x01, 0x02, 0x03])
+        )
+        context.insert(seededAnchor)
+        config.lastSyncedAt = .now
+        config.needsFullSync = false
+        try context.save()
+
+        let engine = SyncEngine(healthKitReader: FakeHealthKitReader())
+        engine.resetAnchors(modelContext: context)
+
+        let remaining = try context.fetch(FetchDescriptor<MetricSyncAnchor>())
+        #expect(remaining.isEmpty)
+        #expect(config.needsFullSync == true)
+        #expect(config.lastSyncedAt == nil)
     }
 
     // MARK: - State persistence tests (the bugs that were found in production)
@@ -237,7 +256,7 @@ struct SyncEngineTests {
         #expect(config.needsFullSync == true)
 
         let fakeReader = FakeHealthKitReader()
-        fakeReader.queryDataResult = HealthDataQueryResult(
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
             dataPoints: [makeHeartRatePoint()],
             issues: []
         )
@@ -274,7 +293,7 @@ struct SyncEngineTests {
 
         // Return data but with query issues for one metric
         let fakeReader = FakeHealthKitReader()
-        fakeReader.queryDataResult = HealthDataQueryResult(
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
             dataPoints: [makeHeartRatePoint()],
             issues: [HealthMetricQueryIssue(
                 metric: .steps,
@@ -316,7 +335,7 @@ struct SyncEngineTests {
         defer { try? config.deleteAllCredentials() }
 
         let fakeReader = FakeHealthKitReader()
-        fakeReader.queryDataResult = HealthDataQueryResult(
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
             dataPoints: [makeHeartRatePoint()],
             issues: []
         )
@@ -355,7 +374,7 @@ struct SyncEngineTests {
         defer { try? config.deleteAllCredentials() }
 
         let fakeReader = FakeHealthKitReader()
-        fakeReader.queryDataResult = HealthDataQueryResult(
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
             dataPoints: [makeHeartRatePoint()],
             issues: []
         )
@@ -393,7 +412,7 @@ struct SyncEngineTests {
         defer { try? config.deleteAllCredentials() }
 
         let fakeReader = FakeHealthKitReader()
-        fakeReader.queryDataResult = HealthDataQueryResult(
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
             dataPoints: [makeHeartRatePoint()],
             issues: []
         )
@@ -430,7 +449,7 @@ struct SyncEngineTests {
         defer { try? config.deleteAllCredentials() }
 
         let fakeReader = FakeHealthKitReader()
-        fakeReader.queryDataResult = HealthDataQueryResult(
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
             dataPoints: [
                 makeHeartRatePoint(value: 72),
                 makeHeartRatePoint(value: 75),
@@ -476,7 +495,7 @@ struct SyncEngineTests {
         try context.save()
 
         let fakeReader = FakeHealthKitReader()
-        fakeReader.queryDataResult = HealthDataQueryResult(
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
             dataPoints: [makeHeartRatePoint()],
             issues: []
         )
@@ -509,7 +528,7 @@ struct SyncEngineTests {
         try context.save()
 
         let fakeReader = FakeHealthKitReader()
-        fakeReader.queryDataResult = HealthDataQueryResult(
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
             dataPoints: [makeHeartRatePoint()],
             issues: []
         )
@@ -534,5 +553,212 @@ struct SyncEngineTests {
 
         #expect(fakeReader.queryDataCallCount >= 1)
         #expect(result.successfulDestinations == 1)
+    }
+
+    // MARK: - Reliability: defer + anchor persistence
+
+    @Test("Offline: every destination is deferred, none failed, no HK query attempted")
+    func offlineDefersAllDestinations() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context)
+        defer { try? config.deleteAllCredentials() }
+
+        let fakeReader = FakeHealthKitReader()
+        // If we reach the reader, the test is wrong — offline gate should bail first.
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
+            dataPoints: [makeHeartRatePoint()]
+        )
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService(),
+            networkMonitor: AlwaysOfflineMonitor()
+        )
+
+        let result = await engine.performSync(modelContext: context)
+
+        #expect(result.successfulDestinations == 0)
+        #expect(result.failedDestinations == 0)
+        #expect(result.deferredDestinations == 1)
+        #expect(fakeReader.queryDataCallCount == 0)
+
+        // The persisted SyncRecord should be marked deferred, not failed,
+        // so the history UI doesn't render it as a red error.
+        let records = try context.fetch(FetchDescriptor<SyncRecord>())
+        #expect(records.count == 1)
+        #expect(records.first?.status == .deferred)
+        #expect(records.first?.failureCategory?.deferReason == .offline)
+    }
+
+    @Test("Successful sync persists per-(destination, metric) anchors")
+    func successfulSyncPersistsAnchors() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context, enabledMetrics: [.heartRate])
+        defer { try? config.deleteAllCredentials() }
+
+        let anchorBlob = Data([0xAA, 0xBB, 0xCC])
+        let fakeReader = FakeHealthKitReader()
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
+            dataPoints: [makeHeartRatePoint()],
+            issues: [],
+            newAnchors: [.heartRate: anchorBlob]
+        )
+
+        SyncEngineStubProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: URL(string: "http://ha.local:8123")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data("{}".utf8))
+        }
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService()
+        )
+
+        _ = await engine.performSync(modelContext: context)
+
+        // Anchor must be stored and tied to this destination + metric.
+        let stored = try context.fetch(FetchDescriptor<MetricSyncAnchor>())
+        #expect(stored.count == 1)
+        #expect(stored.first?.destinationID == config.id)
+        #expect(stored.first?.metricRawValue == HealthMetricType.heartRate.rawValue)
+        #expect(stored.first?.anchorData == anchorBlob)
+    }
+
+    @Test("Failed sync does NOT persist anchors — next sync retries the same window")
+    func failedSyncDoesNotPersistAnchors() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context)
+        defer { try? config.deleteAllCredentials() }
+
+        let fakeReader = FakeHealthKitReader()
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
+            dataPoints: [makeHeartRatePoint()],
+            issues: [],
+            newAnchors: [.heartRate: Data([0x42])]
+        )
+
+        // Server error — destination sync throws, anchor must NOT be saved.
+        SyncEngineStubProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: URL(string: "http://ha.local:8123")!,
+                statusCode: 500,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data("fail".utf8))
+        }
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService()
+        )
+
+        _ = await engine.performSync(modelContext: context)
+
+        let stored = try context.fetch(FetchDescriptor<MetricSyncAnchor>())
+        #expect(stored.isEmpty)
+    }
+
+    @Test("Subsequent sync passes the previously stored anchor back to the reader")
+    func subsequentSyncReusesStoredAnchor() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context, enabledMetrics: [.heartRate])
+        defer { try? config.deleteAllCredentials() }
+
+        // Mark as already-synced so the engine takes the incremental path
+        // (anchor lookup) instead of using the destination's full-sync window.
+        config.lastSyncedAt = .now.addingTimeInterval(-3600)
+        config.needsFullSync = false
+        try context.save()
+
+        let firstAnchor = Data([0x01, 0x02])
+        let fakeReader = FakeHealthKitReader()
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
+            dataPoints: [makeHeartRatePoint()],
+            issues: [],
+            newAnchors: [.heartRate: firstAnchor]
+        )
+
+        SyncEngineStubProtocol.requestHandler = { _ in
+            let response = HTTPURLResponse(
+                url: URL(string: "http://ha.local:8123")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data("{}".utf8))
+        }
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService()
+        )
+
+        // First run — anchor saved.
+        _ = await engine.performSync(modelContext: context)
+
+        // Second run — engine should hand the stored anchor back to the reader.
+        // Mark recent-sync window past so the engine doesn't skip the destination.
+        config.lastSyncedAt = .now.addingTimeInterval(-3600)
+        try context.save()
+        _ = await engine.performSync(modelContext: context)
+
+        #expect(fakeReader.lastQueriedAnchors[.heartRate] == firstAnchor)
+    }
+
+    @Test("URLError.cancelled is classified as deferred(.outOfTime), not a failure")
+    func cancelledRequestIsDeferred() async throws {
+        let container = try makeModelContainer()
+        let context = ModelContext(container)
+
+        let config = try insertHAConfig(into: context)
+        defer { try? config.deleteAllCredentials() }
+
+        let fakeReader = FakeHealthKitReader()
+        fakeReader.queryDataResult = HealthAnchoredQueryResult(
+            dataPoints: [makeHeartRatePoint()]
+        )
+
+        // Throw URLError.cancelled — this is what URLSession raises when
+        // BGTask.expirationHandler cancels the parent task mid-flight.
+        SyncEngineStubProtocol.requestHandler = { _ in
+            throw URLError(.cancelled)
+        }
+
+        let engine = SyncEngine(
+            healthKitReader: fakeReader,
+            networkService: makeStubNetworkService()
+        )
+
+        let result = await engine.performSync(modelContext: context)
+
+        #expect(result.failedDestinations == 0)
+        #expect(result.deferredDestinations == 1)
+        let records = try context.fetch(FetchDescriptor<SyncRecord>())
+        #expect(records.first?.status == .deferred)
+        #expect(records.first?.failureCategory?.deferReason == .outOfTime)
+    }
+}
+
+// MARK: - Test helpers
+
+/// `NetworkPathMonitoring` that always reports unreachable. Used to drive
+/// the offline-defer path in tests.
+private struct AlwaysOfflineMonitor: NetworkPathMonitoring {
+    var isReachable: Bool {
+        false
     }
 }

@@ -64,6 +64,87 @@ struct S3ClientTests {
         }
     }
 
+    @Test("301 PermanentRedirect surfaces as wrongRegion with the bucket's actual region")
+    func wrongRegionFromHeaderProducesActionableError() async throws {
+        let session = makeStubSession()
+        URLProtocolStub.setHandler { request in
+            let requestURL = try #require(request.url)
+            // AWS sets `x-amz-bucket-region` on every redirect response; this
+            // is the most reliable source for the correct region.
+            let response = try #require(HTTPURLResponse(
+                url: requestURL,
+                statusCode: 301,
+                httpVersion: nil,
+                headerFields: ["x-amz-bucket-region": "us-east-1"]
+            ))
+            return (response, Data("<?xml version=\"1.0\"?><Error><Code>PermanentRedirect</Code></Error>".utf8))
+        }
+        defer { URLProtocolStub.reset() }
+
+        let client = S3Client(
+            bucket: "my-bucket",
+            region: "eu-west-1", // wrong on purpose
+            accessKeyID: "AKIA...",
+            secretAccessKey: "secret",
+            session: session
+        )
+
+        do {
+            _ = try await client.testConnection()
+            #expect(Bool(false), "Expected wrongRegion error")
+        } catch let S3Error.wrongRegion(configured, actual, bucket) {
+            #expect(configured == "eu-west-1")
+            #expect(actual == "us-east-1")
+            #expect(bucket == "my-bucket")
+        } catch {
+            #expect(Bool(false), "Unexpected error: \(error)")
+        }
+    }
+
+    @Test("301 with no header falls back to parsing <Region> from the XML body")
+    func wrongRegionFromBodyXmlAlsoWorks() async throws {
+        let session = makeStubSession()
+        URLProtocolStub.setHandler { request in
+            let requestURL = try #require(request.url)
+            // Headerless response — the body is the only source of truth.
+            let response = try #require(HTTPURLResponse(
+                url: requestURL,
+                statusCode: 301,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let body = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <Error>
+              <Code>PermanentRedirect</Code>
+              <Message>The bucket you are attempting to access must be addressed using the specified endpoint.</Message>
+              <Bucket>my-bucket</Bucket>
+              <Endpoint>my-bucket.s3.us-west-2.amazonaws.com</Endpoint>
+              <Region>us-west-2</Region>
+            </Error>
+            """
+            return (response, Data(body.utf8))
+        }
+        defer { URLProtocolStub.reset() }
+
+        let client = S3Client(
+            bucket: "my-bucket",
+            region: "eu-west-1",
+            accessKeyID: "AKIA...",
+            secretAccessKey: "secret",
+            session: session
+        )
+
+        do {
+            _ = try await client.testConnection()
+            #expect(Bool(false), "Expected wrongRegion error")
+        } catch let S3Error.wrongRegion(_, actual, _) {
+            #expect(actual == "us-west-2")
+        } catch {
+            #expect(Bool(false), "Unexpected error: \(error)")
+        }
+    }
+
     private func makeStubSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [URLProtocolStub.self]

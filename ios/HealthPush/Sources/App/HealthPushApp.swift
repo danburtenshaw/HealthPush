@@ -23,7 +23,8 @@ struct HealthPushApp: App {
         // Configure SwiftData
         let schema = Schema([
             SyncRecord.self,
-            DestinationConfig.self
+            DestinationConfig.self,
+            MetricSyncAnchor.self
         ])
         let modelConfiguration = ModelConfiguration(
             "HealthPush",
@@ -66,14 +67,29 @@ struct HealthPushApp: App {
         let appState = appState
         let destinationManager = destinationManager
         let syncEngine = syncEngine
-        BackgroundSyncScheduler.shared.registerTasks { @MainActor in
+        BackgroundSyncScheduler.shared.registerTasks { @MainActor (deadline: Date?) -> Bool in
             // Use the main context so SwiftData changes (lastSyncedAt, needsFullSync)
             // are visible to the UI immediately. Using a separate ModelContext would
             // cause the dashboard to show stale data until the contexts merge.
             let context = container.mainContext
-            let result = await syncEngine.performSync(modelContext: context, isBackground: true)
+            let result = await syncEngine.performSync(
+                modelContext: context,
+                isBackground: true,
+                deadline: deadline
+            )
             appState.recordSyncResult(result)
             destinationManager.loadDestinations(modelContext: context)
+
+            // If we ran out of background time before finishing every destination,
+            // request a quicker retry so the user doesn't wait a full interval to
+            // see the rest of the data flow.
+            if result.deferredDestinations > 0 {
+                BackgroundSyncScheduler.shared.scheduleQuickRetry()
+            }
+
+            // Real failures (not deferrals) determine whether to mark the BGTask
+            // as successful — deferred runs always count as success because
+            // we made the right call.
             return result.failedDestinations == 0
         }
     }
@@ -99,14 +115,14 @@ struct HealthPushApp: App {
         let context = modelContainer.mainContext
         destinationManager.loadDestinations(modelContext: context)
 
-        // Schedule background sync using the most frequent destination's interval
-        let minFrequency = destinationManager.destinations
-            .filter(\.isEnabled)
-            .map(\.syncFrequency)
-            .min(by: { $0.timeInterval < $1.timeInterval })
-            ?? .oneHour
-        BackgroundSyncScheduler.shared.scheduleRefreshTask(frequency: minFrequency)
-        BackgroundSyncScheduler.shared.scheduleProcessingTask(frequency: minFrequency)
+        // Schedule the periodic safety-net BGProcessingTask using the most
+        // frequent destination's interval. The HKObserverQuery push path
+        // (registered below) is what actually delivers timely syncs — this
+        // task is the fallback for periods between observer events.
+        let minFrequency = currentMinFrequency()
+        Task {
+            await BackgroundSyncScheduler.shared.scheduleProcessingTask(frequency: minFrequency)
+        }
 
         // Enable HealthKit background delivery for all metrics across enabled destinations
         let allEnabledMetrics = destinationManager.destinations
@@ -123,20 +139,26 @@ struct HealthPushApp: App {
             }
         }
 
-        // Re-register observers and re-schedule tasks when destinations change
+        // Re-register observers when destinations change. We don't reschedule
+        // the BGProcessingTask here — the existing pending request still has
+        // the right cadence, and re-submitting would reset the clock.
         destinationManager.onDestinationsChanged = { [destinationManager, syncEngine] in
             let allMetrics = destinationManager.destinations
                 .filter(\.isEnabled)
                 .reduce(into: Set<HealthMetricType>()) { $0.formUnion($1.enabledMetrics) }
 
-            let minFreq = destinationManager.destinations
+            // Only re-submit the BGProcessingTask if frequency actually changed.
+            let newFreq = destinationManager.destinations
                 .filter(\.isEnabled)
                 .map(\.syncFrequency)
                 .min(by: { $0.timeInterval < $1.timeInterval })
                 ?? .oneHour
 
-            BackgroundSyncScheduler.shared.scheduleRefreshTask(frequency: minFreq)
-            BackgroundSyncScheduler.shared.scheduleProcessingTask(frequency: minFreq)
+            if newFreq != BackgroundSyncScheduler.shared.lastScheduledFrequency {
+                Task {
+                    await BackgroundSyncScheduler.shared.scheduleProcessingTask(frequency: newFreq, force: true)
+                }
+            }
 
             if !allMetrics.isEmpty {
                 Task {
@@ -151,6 +173,17 @@ struct HealthPushApp: App {
 
         // Clean up old sync records
         cleanupOldRecords(modelContext: context)
+    }
+
+    /// Returns the most-frequent sync interval across all enabled destinations,
+    /// defaulting to one hour when there are none.
+    @MainActor
+    private func currentMinFrequency() -> SyncFrequency {
+        destinationManager.destinations
+            .filter(\.isEnabled)
+            .map(\.syncFrequency)
+            .min(by: { $0.timeInterval < $1.timeInterval })
+            ?? .oneHour
     }
 
     @MainActor
@@ -228,15 +261,10 @@ struct ContentView: View {
             if newPhase == .active {
                 appState.refreshFromUserDefaults()
             }
-            if newPhase == .background {
-                let minFrequency = destinationManager.destinations
-                    .filter(\.isEnabled)
-                    .map(\.syncFrequency)
-                    .min(by: { $0.timeInterval < $1.timeInterval })
-                    ?? .oneHour
-                BackgroundSyncScheduler.shared.scheduleRefreshTask(frequency: minFrequency)
-                BackgroundSyncScheduler.shared.scheduleProcessingTask(frequency: minFrequency)
-            }
+            // Note: we deliberately do NOT re-submit the BGProcessingTask on
+            // every background entry. Re-submitting resets `earliestBeginDate`
+            // and is the chief cause of erratic intervals in production. The
+            // task handler reschedules itself when it runs.
         }
         .alert("Error", isPresented: $appState.showingError) {
             Button("OK") {

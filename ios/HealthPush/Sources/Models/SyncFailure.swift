@@ -8,7 +8,7 @@ import Foundation
 /// ``SyncRecord``. The background scheduler uses ``isRetryable`` to decide whether
 /// to schedule another attempt, and the dashboard uses ``recoveryAction`` to show
 /// user-actionable guidance.
-enum SyncFailure: Sendable, Equatable {
+enum SyncFailure: Equatable {
     /// A temporary error that may resolve on its own (network timeout, server 5xx, etc.).
     case transient(message: String)
 
@@ -18,12 +18,38 @@ enum SyncFailure: Sendable, Equatable {
     /// Some destinations succeeded while others failed.
     case partial(successes: Int, failures: Int, message: String)
 
+    /// Sync was deferred because preconditions weren't met (locked device, offline,
+    /// background-time exhausted). Not a real failure — the next sync will pick up the work.
+    case deferred(reason: DeferReason, message: String)
+
+    /// Why a sync was deferred. Drives icon, label, and messaging in the UI.
+    enum DeferReason: String, Codable {
+        /// HealthKit data is encrypted; device is locked.
+        case deviceLocked
+        /// Network is unreachable.
+        case offline
+        /// Background time budget was exhausted before all work completed.
+        case outOfTime
+    }
+
     /// Whether this failure should be retried automatically.
     var isRetryable: Bool {
         switch self {
         case .transient: true
         case .permanent: false
         case .partial: true
+        case .deferred: true
+        }
+    }
+
+    /// Whether this represents an actual failure (true) or just a deferred run (false).
+    /// Deferred runs should not contribute to "failed" counts shown to the user.
+    var isActualFailure: Bool {
+        switch self {
+        case .transient,
+             .permanent,
+             .partial: true
+        case .deferred: false
         }
     }
 
@@ -34,6 +60,7 @@ enum SyncFailure: Sendable, Equatable {
         case let .permanent(message, _): message
         case let .partial(successes, failures, message):
             "\(successes) succeeded, \(failures) failed: \(message)"
+        case let .deferred(_, message): message
         }
     }
 
@@ -43,6 +70,7 @@ enum SyncFailure: Sendable, Equatable {
         case .transient: "transient"
         case .permanent: "permanent"
         case .partial: "partial"
+        case .deferred: "deferred"
         }
     }
 
@@ -50,6 +78,14 @@ enum SyncFailure: Sendable, Equatable {
     var recoveryAction: RecoveryAction? {
         switch self {
         case let .permanent(_, recovery): recovery
+        default: nil
+        }
+    }
+
+    /// The defer reason, if this is a deferred sync.
+    var deferReason: DeferReason? {
+        switch self {
+        case let .deferred(reason, _): reason
         default: nil
         }
     }
@@ -62,7 +98,7 @@ extension SyncFailure {
     ///
     /// Destinations provide fully formed recovery actions so the UI
     /// never needs destination-specific switch statements.
-    struct RecoveryAction: Codable, Sendable, Equatable {
+    struct RecoveryAction: Codable, Equatable {
         /// Stable identifier for persistence (e.g. "reauthenticate").
         let id: String
         /// Button title shown in the UI (e.g. "Check Credentials").
@@ -82,11 +118,21 @@ extension SyncFailure {
             switch networkError {
             case let .httpError(statusCode, _) where statusCode == 401 || statusCode == 403:
                 return .permanent(message: error.localizedDescription, recovery: .reauthenticate)
-            case .timeout, .connectionFailed:
+            case .timeout,
+                 .connectionFailed:
                 return .transient(message: error.localizedDescription)
             default:
                 break
             }
+        }
+        // URLError.cancelled in a background context typically means the BGTask
+        // expired mid-flight. Treat it as deferred (not a failure) so the user
+        // doesn't see it as an error and the next sync picks up where we left off.
+        if let urlError = error as? URLError, urlError.code == .cancelled {
+            return .deferred(
+                reason: .outOfTime,
+                message: "Sync paused — will resume on the next scheduled run."
+            )
         }
         return .transient(message: error.localizedDescription)
     }

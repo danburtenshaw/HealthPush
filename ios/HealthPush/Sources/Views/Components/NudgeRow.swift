@@ -184,8 +184,11 @@ struct NudgeRow: View {
 
     private var actionButtonLabel: String? {
         switch kind {
-        case let .syncFailure(_, recovery):
-            recovery?.buttonTitle ?? "Review"
+        case .syncFailure:
+            // Always "Review" — the recovery's specific call-to-action (e.g.
+            // "Set region to us-east-1") is shown in the sync record detail
+            // view, which has more space and more context.
+            "Review"
         case .noHealthData:
             "Open Health"
         case .backgroundRefreshDisabled:
@@ -204,7 +207,7 @@ struct NudgeRow: View {
     private var actionAccessibilityHint: String {
         switch kind {
         case .syncFailure:
-            "Opens destination settings to fix the issue"
+            "Opens the sync record details"
         case .noHealthData:
             "Opens Apple Health to review permissions"
         case .backgroundRefreshDisabled:

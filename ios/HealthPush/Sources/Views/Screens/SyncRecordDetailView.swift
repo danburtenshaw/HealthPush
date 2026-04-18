@@ -13,7 +13,11 @@ struct SyncRecordDetailView: View {
     let record: SyncRecord
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(DestinationManager.self) private var destinationManager
     @State private var showCopiedConfirmation = false
+    /// When non-nil, presents the destination edit screen so the user can fix
+    /// the underlying problem (e.g. change the bucket region).
+    @State private var configToEdit: DestinationConfig?
 
     // MARK: Body
 
@@ -32,6 +36,19 @@ struct SyncRecordDetailView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Sync Details")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $configToEdit) { config in
+            if config.destinationType == .s3 {
+                S3SetupScreen(mode: .edit(config))
+            } else {
+                HomeAssistantSetupScreen(mode: .edit(config))
+            }
+        }
+    }
+
+    /// The destination this record was for, if it still exists. Returns nil
+    /// if the destination has been deleted since the sync ran.
+    private var matchingDestination: DestinationConfig? {
+        destinationManager.destinations.first { $0.id == record.destinationID }
     }
 
     // MARK: Sections
@@ -166,13 +183,29 @@ struct SyncRecordDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
-                    Button {
-                        // The recovery action button navigates the user toward fixing the issue.
-                        // In a future iteration this could open the destination settings directly.
-                    } label: {
-                        Label(recovery.buttonTitle, systemImage: "arrow.right.circle")
+                    if let destination = matchingDestination {
+                        Button {
+                            configToEdit = destination
+                        } label: {
+                            Label("Open Destination Settings", systemImage: "slider.horizontal.3")
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityHint("Opens this destination so you can apply the fix described above.")
+                    } else {
+                        // Destination was deleted after this sync ran — no
+                        // editor to open, so be honest about that instead of
+                        // showing a button that goes nowhere.
+                        Text("This destination has been removed.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
                     }
-                    .buttonStyle(.bordered)
+
+                    // Keep the recovery's specific call-to-action visible as
+                    // text — it tells the user *what* to change once they're
+                    // in the editor (e.g. "Set region to us-east-1").
+                    Text(recovery.buttonTitle)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.blue)
                 }
                 .padding(.vertical, HP.Spacing.xs)
             }
@@ -217,6 +250,7 @@ struct SyncRecordDetailView: View {
         case .partialFailure: "exclamationmark.circle.fill"
         case .failure: "xmark.circle.fill"
         case .inProgress: "arrow.triangle.2.circlepath"
+        case .deferred: "clock.arrow.circlepath"
         }
     }
 
@@ -226,6 +260,7 @@ struct SyncRecordDetailView: View {
         case .partialFailure: "Partial"
         case .failure: "Failed"
         case .inProgress: "In Progress"
+        case .deferred: "Deferred"
         }
     }
 
@@ -235,6 +270,7 @@ struct SyncRecordDetailView: View {
         case .partialFailure: .orange
         case .failure: .red
         case .inProgress: .blue
+        case .deferred: .secondary
         }
     }
 
@@ -268,6 +304,7 @@ struct SyncRecordDetailView: View {
         case .transient: "arrow.clockwise.circle"
         case .permanent: "xmark.octagon"
         case .partial: "exclamationmark.triangle"
+        case .deferred: "clock.arrow.circlepath"
         }
     }
 
@@ -276,6 +313,7 @@ struct SyncRecordDetailView: View {
         case .transient: .yellow
         case .permanent: .red
         case .partial: .orange
+        case .deferred: .secondary
         }
     }
 
@@ -284,17 +322,32 @@ struct SyncRecordDetailView: View {
         case .transient: "Transient"
         case .permanent: "Permanent"
         case .partial: "Partial Failure"
+        case let .deferred(reason, _):
+            switch reason {
+            case .deviceLocked: "Deferred — device locked"
+            case .offline: "Deferred — offline"
+            case .outOfTime: "Deferred — out of background time"
+            }
         }
     }
 
     private func failureCategoryExplanation(_ failure: SyncFailure) -> String {
         switch failure {
         case .transient:
-            return "This error is temporary and will be retried automatically on the next sync. Common causes include network timeouts, server errors, or intermittent connectivity."
+            "This error is temporary and will be retried automatically on the next sync. Common causes include network timeouts, server errors, or intermittent connectivity."
         case .permanent:
-            return "This error requires your intervention to resolve. The sync will not be retried until the underlying issue is fixed."
+            "This error requires your intervention to resolve. The sync will not be retried until the underlying issue is fixed."
         case let .partial(successes, failures, _):
-            return "\(successes) destination(s) succeeded and \(failures) failed. The next sync will retry the failed destinations."
+            "\(successes) destination(s) succeeded and \(failures) failed. The next sync will retry the failed destinations."
+        case let .deferred(reason, _):
+            switch reason {
+            case .deviceLocked:
+                "HealthKit data is encrypted while the device is locked. The next sync will run as soon as you unlock — no action needed."
+            case .offline:
+                "No network connection was available. The next sync will run automatically when you're back online."
+            case .outOfTime:
+                "iOS reclaimed the background slot before this sync finished. A quick retry has been scheduled."
+            }
         }
     }
 
@@ -351,5 +404,6 @@ struct SyncRecordDetailView: View {
                 isBackgroundSync: true
             )
         )
+        .environment(DestinationManager())
     }
 }

@@ -17,6 +17,11 @@ enum S3Error: LocalizedError {
     case downloadFailed(String)
     case connectionFailed(String)
     case authenticationFailed
+    /// AWS returned a 301/307 PermanentRedirect/TemporaryRedirect indicating the
+    /// bucket lives in a different region than the one configured. The actual
+    /// region is extracted from the `x-amz-bucket-region` response header (or
+    /// the `<Region>` element in the XML body as a fallback).
+    case wrongRegion(configured: String, actual: String, bucket: String)
 
     var errorDescription: String? {
         switch self {
@@ -30,6 +35,11 @@ enum S3Error: LocalizedError {
             "S3 connection failed: \(msg)"
         case .authenticationFailed:
             "S3 authentication failed. Check your access keys."
+        case let .wrongRegion(configured, actual, _):
+            // Short on purpose — this string is shown in the dashboard nudge
+            // (which has limited width). The full bucket name and longer
+            // guidance live in the recovery action that the detail view shows.
+            "Bucket region is '\(actual)', not '\(configured)'. Update this destination's region."
         }
     }
 }
@@ -277,8 +287,9 @@ struct S3Client {
     }
 
     private func perform(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        let pair: (Data, URLResponse)
         do {
-            return try await session.data(for: request)
+            pair = try await session.data(for: request)
         } catch let error as URLError {
             switch error.code {
             case .cancelled:
@@ -292,6 +303,52 @@ struct S3Client {
                 throw S3Error.connectionFailed(error.localizedDescription)
             }
         }
+
+        let (data, response) = pair
+
+        // AWS returns 301 PermanentRedirect (or 307 during bucket creation
+        // propagation) when the bucket lives in a different region than the
+        // request was sent to. The correct region comes back in the
+        // `x-amz-bucket-region` response header. Surface this as a dedicated
+        // error so the user can be told exactly what to set the region to,
+        // instead of seeing a raw XML payload.
+        if let http = response as? HTTPURLResponse,
+           http.statusCode == 301 || http.statusCode == 307,
+           let actualRegion = Self.extractBucketRegion(from: http, body: data)
+        {
+            throw S3Error.wrongRegion(configured: region, actual: actualRegion, bucket: bucket)
+        }
+
+        return (data, response)
+    }
+
+    /// Extracts the bucket's actual region from a 301/307 response.
+    /// Prefers the `x-amz-bucket-region` header (set by AWS on every redirect
+    /// response) and falls back to parsing `<Region>` from the XML body.
+    static func extractBucketRegion(from response: HTTPURLResponse, body: Data) -> String? {
+        if let header = response.value(forHTTPHeaderField: "x-amz-bucket-region"),
+           !header.isEmpty
+        {
+            return header
+        }
+        guard let xml = String(data: body, encoding: .utf8) else { return nil }
+        return extractFirstXMLElement(named: "Region", in: xml)
+    }
+
+    /// Lightweight XML element extractor. Pulls the inner text of the first
+    /// `<\(name)>...</\(name)>` element it finds. We avoid pulling in an XML
+    /// parser dependency for this single AWS error case.
+    private static func extractFirstXMLElement(named name: String, in xml: String) -> String? {
+        let openTag = "<\(name)>"
+        let closeTag = "</\(name)>"
+        guard let openRange = xml.range(of: openTag),
+              let closeRange = xml.range(of: closeTag, range: openRange.upperBound..<xml.endIndex)
+        else {
+            return nil
+        }
+        let value = xml[openRange.upperBound..<closeRange.lowerBound]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
     }
 }
 

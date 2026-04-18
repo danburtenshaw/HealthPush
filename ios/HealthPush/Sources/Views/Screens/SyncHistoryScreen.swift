@@ -15,14 +15,20 @@ struct SyncHistoryScreen: View {
     @Query(sort: \SyncRecord.timestamp, order: .reverse)
     private var syncRecords: [SyncRecord]
 
+    /// If set, the screen pushes that record's detail view onto the navigation
+    /// stack on first appearance. Used by the dashboard nudge so tapping
+    /// "Review" lands on the failed record directly.
+    var initialRecordID: UUID?
+
     @State private var selectedFilter: SyncHistoryFilter = .all
     @State private var searchText = ""
     @State private var selectedChartDay: Date?
+    @State private var navigationPath: [UUID] = []
 
     // MARK: Body
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             Group {
                 if filteredRecords.isEmpty {
                     emptyState
@@ -32,6 +38,11 @@ struct SyncHistoryScreen: View {
             }
             .navigationTitle("Sync History")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                if let initialRecordID, navigationPath.isEmpty {
+                    navigationPath.append(initialRecordID)
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
@@ -161,16 +172,17 @@ struct SyncHistoryScreen: View {
     // MARK: Data
 
     private var filteredRecords: [SyncRecord] {
-        var records: [SyncRecord]
-        switch selectedFilter {
+        var records: [SyncRecord] = switch selectedFilter {
         case .all:
-            records = syncRecords
+            syncRecords
         case .success:
-            records = syncRecords.filter { $0.status == .success }
+            // Treat deferred as informational success — the user took no action;
+            // the next sync will pick up automatically.
+            syncRecords.filter { $0.status == .success || $0.status == .deferred }
         case .failed:
-            records = syncRecords.filter { $0.status == .failure || $0.status == .partialFailure }
+            syncRecords.filter { $0.status == .failure || $0.status == .partialFailure }
         case .background:
-            records = syncRecords.filter(\.isBackgroundSync)
+            syncRecords.filter(\.isBackgroundSync)
         }
 
         if !searchText.isEmpty {
@@ -350,6 +362,7 @@ struct SyncRecordRow: View {
         case .partialFailure: "partially failed"
         case .failure: "failed"
         case .inProgress: "in progress"
+        case .deferred: "deferred"
         }
     }
 
@@ -367,6 +380,7 @@ struct SyncRecordRow: View {
         case .partialFailure: "exclamationmark.circle.fill"
         case .failure: "xmark.circle.fill"
         case .inProgress: "arrow.triangle.2.circlepath"
+        case .deferred: "clock.arrow.circlepath"
         }
     }
 
@@ -376,6 +390,9 @@ struct SyncRecordRow: View {
         case .partialFailure: .orange
         case .failure: .red
         case .inProgress: .blue
+        // Deferred is informational, not a problem — use the secondary text
+        // color so it reads as "neutral, will retry" rather than red/orange.
+        case .deferred: .secondary
         }
     }
 

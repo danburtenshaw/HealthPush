@@ -33,6 +33,9 @@ struct DashboardScreen: View {
     @State private var lastSyncSucceeded = false
     @State private var nudgeDismissed = false
     @State private var showSyncSuccess = false
+    /// When the user taps the dashboard's "Sync Needs Attention" nudge, we
+    /// open the history sheet pre-pushed to that record's detail view.
+    @State private var pendingHistoryRecordID: UUID?
 
     // MARK: Body
 
@@ -105,8 +108,8 @@ struct DashboardScreen: View {
                     .accessibilityHint("View past sync operations")
                 }
             }
-            .sheet(isPresented: $showingSyncHistory) {
-                SyncHistoryScreen()
+            .sheet(isPresented: $showingSyncHistory, onDismiss: { pendingHistoryRecordID = nil }) {
+                SyncHistoryScreen(initialRecordID: pendingHistoryRecordID)
             }
             .sheet(isPresented: $showingDestinationPicker) {
                 AddDestinationSheet { type in
@@ -194,12 +197,15 @@ struct DashboardScreen: View {
 
     private func handleNudgeAction(_ nudge: NudgeKind) {
         switch nudge {
-        case let .syncFailure(_, recovery):
-            if recovery != nil, let record = latestIssueRecord {
-                navigateToRecovery(record: record)
-            } else if let preferred = destinationManager.destinations.first(where: \.isEnabled) {
-                selectedConfig = preferred
+        case .syncFailure:
+            // Open the history sheet pre-pushed to the failed record's detail.
+            // The detail view exposes the recovery action (e.g. "Set region to
+            // us-east-1"), which takes the user from there to the destination
+            // editor — keeping the failure context one tap away from the fix.
+            if let record = latestIssueRecord {
+                pendingHistoryRecordID = record.id
             }
+            showingSyncHistory = true
         case .noHealthData:
             if let url = URL(string: "x-apple-health://") {
                 UIApplication.shared.open(url)
@@ -475,14 +481,17 @@ struct DashboardScreen: View {
             }
         }
 
-        // Re-schedule background tasks with fresh earliest begin date
+        // After a manual sync, schedule the next periodic safety-net task with
+        // a fresh earliest begin date. (Foreground syncs don't go through the
+        // BGTask handler, so it doesn't reschedule itself.)
         let minFrequency = destinationManager.destinations
             .filter(\.isEnabled)
             .map(\.syncFrequency)
             .min(by: { $0.timeInterval < $1.timeInterval })
             ?? .oneHour
-        BackgroundSyncScheduler.shared.scheduleRefreshTask(frequency: minFrequency)
-        BackgroundSyncScheduler.shared.scheduleProcessingTask(frequency: minFrequency)
+        Task {
+            await BackgroundSyncScheduler.shared.scheduleProcessingTask(frequency: minFrequency, force: true)
+        }
 
         // Reload destinations to reflect updated state
         destinationManager.loadDestinations(modelContext: modelContext)
@@ -551,12 +560,6 @@ struct DashboardScreen: View {
         }
         return nil
     }
-
-    private func navigateToRecovery(record: SyncRecord) {
-        let matchingConfig = destinationManager.destinations.first { $0.id == record.destinationID }
-        selectedConfig = matchingConfig ?? destinationManager.destinations.first(where: \.isEnabled)
-    }
-
 }
 
 // MARK: - RecentSyncRow
@@ -609,6 +612,7 @@ private struct RecentSyncRow: View {
         case .partialFailure: "partially failed"
         case .failure: "failed"
         case .inProgress: "in progress"
+        case .deferred: "deferred"
         }
     }
 
@@ -618,6 +622,7 @@ private struct RecentSyncRow: View {
         case .partialFailure: "exclamationmark.circle.fill"
         case .failure: "xmark.circle.fill"
         case .inProgress: "arrow.triangle.2.circlepath"
+        case .deferred: "clock.arrow.circlepath"
         }
     }
 
@@ -627,6 +632,7 @@ private struct RecentSyncRow: View {
         case .partialFailure: .orange
         case .failure: .red
         case .inProgress: .blue
+        case .deferred: .secondary
         }
     }
 }

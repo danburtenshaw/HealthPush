@@ -111,6 +111,14 @@ struct S3Destination: SyncDestination {
     }
 
     func classifyError(_ error: Error) -> SyncFailure {
+        // Wrong-region first — covers both direct S3Error throws (e.g. from
+        // testConnection) and S3Errors wrapped/raised inside the sync service.
+        if let s3Error = error as? S3Error, case let .wrongRegion(_, actual, bucket) = s3Error {
+            return .permanent(
+                message: error.localizedDescription,
+                recovery: Self.fixRegion(actual: actual, bucket: bucket)
+            )
+        }
         if let s3Error = error as? S3DestinationError {
             switch s3Error {
             case .invalidConfiguration:
@@ -128,4 +136,14 @@ struct S3Destination: SyncDestination {
         buttonTitle: "Fix Bucket Config",
         guidance: "Review the S3 bucket and region settings."
     )
+
+    /// Recovery action for a wrong-region 301 — names the correct region so
+    /// the user sees the answer in the button and the guidance text.
+    private static func fixRegion(actual: String, bucket: String) -> SyncFailure.RecoveryAction {
+        SyncFailure.RecoveryAction(
+            id: "fixS3Region",
+            buttonTitle: "Set region to \(actual)",
+            guidance: "Bucket '\(bucket)' is hosted in '\(actual)'. Open this destination's settings, change the Region field to '\(actual)', and try again."
+        )
+    }
 }

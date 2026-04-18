@@ -6,8 +6,9 @@ import Foundation
 final class FakeHealthKitReader: HealthKitReading, @unchecked Sendable {
     // MARK: Configurable Results
 
-    /// Result returned by ``queryData(for:from:to:)``.
-    var queryDataResult = HealthDataQueryResult(dataPoints: [], issues: [])
+    /// Result returned by ``queryData(for:anchors:fallbackStart:end:)``.
+    /// Defaults to an empty result with no new anchors.
+    var queryDataResult = HealthAnchoredQueryResult(dataPoints: [], issues: [], newAnchors: [:])
 
     /// Result returned by ``queryDailyStatistics(for:from:to:)``.
     var queryStatsResult = HealthDataQueryResult(dataPoints: [], issues: [])
@@ -26,17 +27,23 @@ final class FakeHealthKitReader: HealthKitReading, @unchecked Sendable {
     /// Number of times ``requestAuthorization`` was called.
     var requestAuthCallCount = 0
 
-    /// Number of times ``resetAnchors`` was called.
-    var resetAnchorsCallCount = 0
+    /// Anchors passed in on the most recent ``queryData`` call.
+    var lastQueriedAnchors: [HealthMetricType: Data] = [:]
+
+    /// Fallback-start passed in on the most recent ``queryData`` call.
+    var lastFallbackStart: Date?
 
     // MARK: HealthKitReading
 
     func queryData(
         for metrics: Set<HealthMetricType>,
-        from start: Date,
-        to end: Date
-    ) async -> HealthDataQueryResult {
+        anchors: [HealthMetricType: Data],
+        fallbackStart: Date,
+        end: Date
+    ) async -> HealthAnchoredQueryResult {
         queryDataCallCount += 1
+        lastQueriedAnchors = anchors
+        lastFallbackStart = fallbackStart
         return queryDataResult
     }
 
@@ -59,9 +66,5 @@ final class FakeHealthKitReader: HealthKitReading, @unchecked Sendable {
     func requestAuthorization(for metrics: Set<HealthMetricType>) async throws {
         requestAuthCallCount += 1
         if let error = authorizationError { throw error }
-    }
-
-    func resetAnchors() async {
-        resetAnchorsCallCount += 1
     }
 }

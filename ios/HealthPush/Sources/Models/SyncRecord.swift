@@ -9,6 +9,10 @@ enum SyncStatus: String, Codable {
     case partialFailure
     case failure
     case inProgress
+    /// The sync was deferred because preconditions weren't met (locked device,
+    /// offline, background-time exhausted). Visually distinct from `.failure`
+    /// because the next sync will pick up the work — no user action needed.
+    case deferred
 }
 
 // MARK: - SyncRecord
@@ -63,6 +67,9 @@ final class SyncRecord {
         set { statusRaw = newValue.rawValue }
     }
 
+    /// Persisted defer reason ("deviceLocked", "offline", "outOfTime") for `.deferred` failures.
+    var deferReasonRaw: String?
+
     /// The structured failure category, reconstructed from stored raw values.
     var failureCategory: SyncFailure? {
         guard let raw = failureCategoryRaw else { return nil }
@@ -79,6 +86,9 @@ final class SyncRecord {
                 failures: partialFailureCount ?? 0,
                 message: message
             )
+        case "deferred":
+            let reason = deferReasonRaw.flatMap(SyncFailure.DeferReason.init(rawValue:)) ?? .outOfTime
+            return .deferred(reason: reason, message: message)
         default:
             return nil
         }
@@ -99,6 +109,9 @@ final class SyncRecord {
         if case let .partial(successes, failures, _) = failure {
             partialSuccessCount = successes
             partialFailureCount = failures
+        }
+        if case let .deferred(reason, _) = failure {
+            deferReasonRaw = reason.rawValue
         }
     }
 

@@ -45,8 +45,32 @@ struct SyncResult {
 
     let successfulDestinations: Int
     let failedDestinations: Int
+
+    /// Destinations that were deferred (locked device, offline, ran out of time).
+    /// Distinct from `failedDestinations` because deferred runs aren't real failures —
+    /// the next sync will pick up the work without user intervention.
+    let deferredDestinations: Int
+
     let duration: TimeInterval
     let errors: [SyncDestinationError]
+
+    init(
+        dataPointCount: Int,
+        processedDataPointCount: Int,
+        successfulDestinations: Int,
+        failedDestinations: Int,
+        deferredDestinations: Int = 0,
+        duration: TimeInterval,
+        errors: [SyncDestinationError]
+    ) {
+        self.dataPointCount = dataPointCount
+        self.processedDataPointCount = processedDataPointCount
+        self.successfulDestinations = successfulDestinations
+        self.failedDestinations = failedDestinations
+        self.deferredDestinations = deferredDestinations
+        self.duration = duration
+        self.errors = errors
+    }
 }
 
 // MARK: - SyncEngine
@@ -64,10 +88,22 @@ final class SyncEngine {
     private let signposter = OSSignposter(subsystem: "app.healthpush", category: "Performance")
     private var healthKitReader: (any HealthKitReading)?
     private let networkService: NetworkService
+    private let networkMonitor: any NetworkPathMonitoring
 
     /// Factory closure that creates a ``SyncDestination`` from a config.
     /// Defaults to ``DestinationManager/makeDestination(for:networkService:)``.
     private let destinationFactory: @MainActor (DestinationConfig, NetworkService) throws -> any SyncDestination
+
+    /// Default fallback window when no anchor exists yet (first sync after install
+    /// or after a manual reset). HealthKit data older than this on first run will
+    /// not be backfilled — subsequent syncs use anchors and pick up everything new.
+    private static let initialFallbackLookbackDays = 7
+
+    /// Daily-statistics window for cumulative metrics. Re-queries the last few
+    /// days every sync so late-arriving samples get folded into the right
+    /// daily total. Safe because output is small (one point per day per metric)
+    /// and uploads are idempotent at the destination layer.
+    private static let cumulativeRollingLookbackDays = 3
 
     // MARK: Initialization
 
@@ -77,6 +113,7 @@ final class SyncEngine {
     /// device, the reader is set to `nil` and syncs will report a graceful error.
     init() {
         networkService = NetworkService()
+        networkMonitor = NetworkPathMonitor.shared
         destinationFactory = DestinationManager.makeDestination
         do {
             healthKitReader = try HealthKitManager()
@@ -87,34 +124,35 @@ final class SyncEngine {
     }
 
     /// Creates a sync engine with injected dependencies (for testing).
-    ///
-    /// - Parameters:
-    ///   - healthKitReader: A ``HealthKitReading`` implementation, or `nil` to simulate unavailability.
-    ///   - networkService: The network service for destination requests.
-    ///   - destinationFactory: Closure to create destinations from configs. Defaults to ``DestinationManager/makeDestination(for:networkService:)``.
     init(
         healthKitReader: (any HealthKitReading)?,
         networkService: NetworkService = NetworkService(),
-        destinationFactory: @MainActor @escaping (DestinationConfig, NetworkService) throws -> any SyncDestination = DestinationManager.makeDestination
+        networkMonitor: any NetworkPathMonitoring = AlwaysReachableNetworkMonitor(),
+        destinationFactory: @MainActor @escaping (DestinationConfig, NetworkService) throws -> any SyncDestination = DestinationManager
+            .makeDestination
     ) {
         self.networkService = networkService
+        self.networkMonitor = networkMonitor
         self.healthKitReader = healthKitReader
         self.destinationFactory = destinationFactory
     }
 
     // MARK: Sync Operations
 
+    typealias ProgressHandler = @MainActor (String, Double) -> Void
+
     /// Performs a full sync for all enabled destinations.
     /// - Parameters:
     ///   - modelContext: The SwiftData model context for persistence.
     ///   - isBackground: Whether this is a background sync.
-    /// - Returns: The sync result.
-    /// Progress callback: (destinationName, fractionComplete)
-    typealias ProgressHandler = @MainActor (String, Double) -> Void
-
+    ///   - deadline: Optional cutoff time. When set, the engine checks remaining
+    ///     time between destinations and defers any unstarted work, marking it
+    ///     `.deferred(.outOfTime, ...)` instead of attempting it under a doomed budget.
+    ///   - onProgress: Per-destination progress callback (name, fractionComplete).
     func performSync(
         modelContext: ModelContext,
         isBackground: Bool = false,
+        deadline: Date? = nil,
         onProgress: ProgressHandler? = nil
     ) async -> SyncResult {
         let syncState = signposter.beginInterval("performSync")
@@ -138,6 +176,7 @@ final class SyncEngine {
                 processedDataPointCount: 0,
                 successfulDestinations: 0,
                 failedDestinations: 0,
+                deferredDestinations: 0,
                 duration: Date().timeIntervalSince(startTime),
                 errors: []
             )
@@ -151,6 +190,7 @@ final class SyncEngine {
                 processedDataPointCount: 0,
                 successfulDestinations: 0,
                 failedDestinations: 0,
+                deferredDestinations: 0,
                 duration: Date().timeIntervalSince(startTime),
                 errors: [SyncDestinationError(
                     destinationName: "HealthKit",
@@ -159,9 +199,24 @@ final class SyncEngine {
             )
         }
 
+        // Reachability gate — if offline, defer the whole run rather than
+        // letting each destination fail with a network error.
+        guard networkMonitor.isReachable else {
+            logger.info("Sync deferred — network unreachable")
+            return makeDeferredResult(
+                for: destinations,
+                modelContext: modelContext,
+                isBackground: isBackground,
+                reason: .offline,
+                message: "No network connection — will retry when online.",
+                startTime: startTime
+            )
+        }
+
         // Sync each destination independently with its own query window
         var successCount = 0
         var failCount = 0
+        var deferredCount = 0
         var totalDataPoints = 0
         var totalProcessedPoints = 0
         var errors: [SyncDestinationError] = []
@@ -184,6 +239,23 @@ final class SyncEngine {
                 continue
             }
 
+            // Time-budget gate — bail before starting a new destination if we're
+            // already past the deadline. Mark remaining work as deferred-out-of-time
+            // so the user sees an informational entry, not an error.
+            if let deadline, Date.now >= deadline {
+                logger.info("Deferring \(config.name) — out of background time")
+                let record = makeRecord(for: config, startTime: startTime, isBackground: isBackground, modelContext: modelContext)
+                let failure = SyncFailure.deferred(
+                    reason: .outOfTime,
+                    message: "Skipped — ran out of background time. Will retry next sync."
+                )
+                record.status = .deferred
+                record.applyFailure(failure)
+                record.duration = Date().timeIntervalSince(startTime)
+                deferredCount += 1
+                continue
+            }
+
             let destState = signposter.beginInterval("syncDestination", id: signposter.makeSignpostID(), "\(config.name)")
 
             // Create the destination via the injected factory.
@@ -201,33 +273,38 @@ final class SyncEngine {
                 continue
             }
 
-            let (rawDataPoints, queryIssues) = await queryHealthData(
+            let queryOutcome = await queryHealthData(
                 for: config,
                 destination: destination,
-                healthKitReader: healthKitReader
+                healthKitReader: healthKitReader,
+                modelContext: modelContext
             )
 
             // Strip source metadata (app name, bundle ID) when the user has opted out.
             let dataPoints = config.includeSourceMetadata
-                ? rawDataPoints
-                : rawDataPoints.map { $0.strippingSourceMetadata() }
+                ? queryOutcome.dataPoints
+                : queryOutcome.dataPoints.map { $0.strippingSourceMetadata() }
 
             logger.info("Queried \(dataPoints.count) data points for \(config.name)")
 
             let result = await syncDestination(
-                config: config,
-                destination: destination,
-                dataPoints: dataPoints,
-                queryIssues: queryIssues,
-                startTime: startTime,
+                inputs: DestinationSyncInputs(
+                    config: config,
+                    destination: destination,
+                    dataPoints: dataPoints,
+                    queryIssues: queryOutcome.issues,
+                    pendingAnchors: queryOutcome.newAnchors,
+                    startTime: startTime,
+                    isBackground: isBackground
+                ),
                 modelContext: modelContext,
-                isBackground: isBackground,
                 onProgress: onProgress
             )
             totalDataPoints += result.dataPointCount
             totalProcessedPoints += result.processedDataPointCount
             successCount += result.successCount
             failCount += result.failCount
+            deferredCount += result.deferredCount
             errors.append(contentsOf: result.errors)
 
             signposter.endInterval("syncDestination", destState)
@@ -244,7 +321,10 @@ final class SyncEngine {
         pruneOldSyncRecords(modelContext: modelContext)
 
         let duration = Date().timeIntervalSince(startTime)
-        logger.info("Sync completed in \(String(format: "%.1f", duration))s: \(successCount) succeeded, \(failCount) failed")
+        logger
+            .info(
+                "Sync completed in \(String(format: "%.1f", duration))s: \(successCount) succeeded, \(failCount) failed, \(deferredCount) deferred"
+            )
 
         signposter.endInterval("performSync", syncState)
         return SyncResult(
@@ -252,18 +332,13 @@ final class SyncEngine {
             processedDataPointCount: totalProcessedPoints,
             successfulDestinations: successCount,
             failedDestinations: failCount,
+            deferredDestinations: deferredCount,
             duration: duration,
             errors: errors
         )
     }
 
     /// Enables HealthKit background delivery for the given metrics.
-    ///
-    /// Delegates to the internal `HealthKitManager` to register observer queries.
-    /// When new health data arrives, the `onUpdate` callback is invoked.
-    /// - Parameters:
-    ///   - metrics: The health metrics to observe.
-    ///   - onUpdate: Callback when new data is available.
     func enableBackgroundDelivery(
         for metrics: Set<HealthMetricType>,
         onUpdate: @escaping @Sendable () async -> Void
@@ -272,7 +347,6 @@ final class SyncEngine {
     }
 
     /// Requests HealthKit authorization for the given metrics.
-    /// - Parameter metrics: The health metrics to authorize.
     func requestHealthKitAuthorization(for metrics: Set<HealthMetricType>) async throws {
         guard let healthKitReader else {
             throw SyncError.healthKitUnavailable
@@ -280,33 +354,62 @@ final class SyncEngine {
         try await healthKitReader.requestAuthorization(for: metrics)
     }
 
-    /// Resets all HealthKit anchors, forcing a full re-sync next time.
-    func resetAnchors() async {
-        await healthKitReader?.resetAnchors()
+    /// Resets all stored sync anchors so the next sync re-fetches a wider history.
+    /// Also flips every destination's `needsFullSync` back to true.
+    func resetAnchors(modelContext: ModelContext) {
+        do {
+            try modelContext.delete(model: MetricSyncAnchor.self)
+            let descriptor = FetchDescriptor<DestinationConfig>()
+            let configs = try modelContext.fetch(descriptor)
+            for config in configs {
+                config.needsFullSync = true
+                config.lastSyncedAt = nil
+            }
+            try modelContext.save()
+            logger.info("Reset all sync anchors and marked destinations for full re-sync")
+        } catch {
+            logger.error("Failed to reset anchors: \(error.localizedDescription)")
+        }
     }
 
     // MARK: Single-Destination Sync
 
     /// Result of syncing a single destination, used to aggregate into the overall SyncResult.
     private struct DestinationSyncResult {
-        var dataPointCount: Int = 0
-        var processedDataPointCount: Int = 0
-        var successCount: Int = 0
-        var failCount: Int = 0
+        var dataPointCount = 0
+        var processedDataPointCount = 0
+        var successCount = 0
+        var failCount = 0
+        var deferredCount = 0
         var errors: [SyncDestinationError] = []
+    }
+
+    /// Inputs for a single destination's sync. Bundling these keeps
+    /// `syncDestination` under SwiftLint's parameter-count budget.
+    private struct DestinationSyncInputs {
+        let config: DestinationConfig
+        let destination: any SyncDestination
+        let dataPoints: [HealthDataPoint]
+        let queryIssues: [HealthMetricQueryIssue]
+        let pendingAnchors: [HealthMetricType: Data]
+        let startTime: Date
+        let isBackground: Bool
     }
 
     /// Pushes data to a single destination, records the outcome, and returns aggregate counts.
     private func syncDestination(
-        config: DestinationConfig,
-        destination: any SyncDestination,
-        dataPoints: [HealthDataPoint],
-        queryIssues: [HealthMetricQueryIssue],
-        startTime: Date,
+        inputs: DestinationSyncInputs,
         modelContext: ModelContext,
-        isBackground: Bool,
         onProgress: ProgressHandler?
     ) async -> DestinationSyncResult {
+        let config = inputs.config
+        let destination = inputs.destination
+        let dataPoints = inputs.dataPoints
+        let queryIssues = inputs.queryIssues
+        let pendingAnchors = inputs.pendingAnchors
+        let startTime = inputs.startTime
+        let isBackground = inputs.isBackground
+
         var result = DestinationSyncResult()
 
         let record = SyncRecord(
@@ -340,6 +443,11 @@ final class SyncEngine {
                 config.needsFullSync = false
             }
 
+            // Persist the new anchors only after a successful destination delivery.
+            // If we'd persisted them earlier and the destination call failed, the next
+            // sync would skip past the un-delivered samples and create a permanent gap.
+            persistAnchors(pendingAnchors, for: config, modelContext: modelContext)
+
             if queryIssues.isEmpty {
                 record.status = .success
                 result.successCount = 1
@@ -365,15 +473,29 @@ final class SyncEngine {
             }
         } catch {
             let failure = destination.classifyError(error)
-            record.status = .failure
             record.applyFailure(failure)
             record.duration = Date().timeIntervalSince(startTime)
-            result.failCount = 1
-            result.errors.append(SyncDestinationError(
-                destinationName: config.name,
-                errorDescription: failure.displayMessage
-            ))
-            logger.error("Sync failed for \(config.name) [\(failure.categoryRaw)]: \(failure.displayMessage)")
+
+            // Deferred outcomes (locked / offline / ran-out-of-time) are not real
+            // failures — they're informational and the next sync will retry the
+            // same window. Don't increment failCount for them.
+            if case .deferred = failure {
+                record.status = .deferred
+                result.deferredCount = 1
+                result.errors.append(SyncDestinationError(
+                    destinationName: config.name,
+                    errorDescription: failure.displayMessage
+                ))
+                logger.info("Sync deferred for \(config.name) [\(failure.categoryRaw)]: \(failure.displayMessage)")
+            } else {
+                record.status = .failure
+                result.failCount = 1
+                result.errors.append(SyncDestinationError(
+                    destinationName: config.name,
+                    errorDescription: failure.displayMessage
+                ))
+                logger.error("Sync failed for \(config.name) [\(failure.categoryRaw)]: \(failure.displayMessage)")
+            }
         }
 
         return result
@@ -381,38 +503,57 @@ final class SyncEngine {
 
     // MARK: Health Data Queries
 
-    /// Queries HealthKit for all enabled metrics on a destination, using the destination's
-    /// preferred query windows for discrete and cumulative metric types.
+    /// Aggregated query output for a single destination.
+    private struct QueryOutcome {
+        var dataPoints: [HealthDataPoint]
+        var issues: [HealthMetricQueryIssue]
+        var newAnchors: [HealthMetricType: Data]
+    }
+
+    /// Queries HealthKit for all enabled metrics on a destination.
+    ///
+    /// - Discrete metrics (heart rate, sleep, etc.) use HKAnchoredObjectQuery
+    ///   with a per-(destination, metric) stored anchor. New anchors returned
+    ///   here are NOT yet persisted — the caller persists them only after a
+    ///   successful destination delivery to prevent gaps.
+    /// - Cumulative metrics (steps, energy) keep using HKStatisticsCollectionQuery
+    ///   with a short rolling window because aggregations can change retroactively.
     private func queryHealthData(
         for config: DestinationConfig,
         destination: any SyncDestination,
-        healthKitReader: any HealthKitReading
-    ) async -> (dataPoints: [HealthDataPoint], issues: [HealthMetricQueryIssue]) {
+        healthKitReader: any HealthKitReading,
+        modelContext: ModelContext
+    ) async -> QueryOutcome {
         let now = Date.now
-        let discreteWindow = destination.queryWindow(
-            lastSyncedAt: config.lastSyncedAt,
-            needsFullSync: config.needsFullSync,
-            now: now
-        )
         let cumulativeWindow = destination.cumulativeQueryWindow(
             lastSyncedAt: config.lastSyncedAt,
             now: now
-        ) ?? discreteWindow
+        ) ?? defaultCumulativeWindow(now: now)
 
         let cumulativeMetrics = config.enabledMetrics.filter(\.isCumulative)
         let discreteMetrics = config.enabledMetrics.subtracting(cumulativeMetrics)
 
         var dataPoints: [HealthDataPoint] = []
         var queryIssues: [HealthMetricQueryIssue] = []
+        var newAnchors: [HealthMetricType: Data] = [:]
 
         if !discreteMetrics.isEmpty {
-            let discrete = await healthKitReader.queryData(
+            let anchors = config.needsFullSync
+                ? [:]
+                : loadAnchors(for: config, metrics: discreteMetrics, modelContext: modelContext)
+            let fallbackStart = config.needsFullSync
+                ? destination.queryWindow(lastSyncedAt: config.lastSyncedAt, needsFullSync: true, now: now).start
+                : Calendar.current.date(byAdding: .day, value: -Self.initialFallbackLookbackDays, to: now) ?? now
+
+            let result = await healthKitReader.queryData(
                 for: discreteMetrics,
-                from: discreteWindow.start,
-                to: discreteWindow.end
+                anchors: anchors,
+                fallbackStart: fallbackStart,
+                end: now
             )
-            dataPoints.append(contentsOf: discrete.dataPoints)
-            queryIssues.append(contentsOf: discrete.issues)
+            dataPoints.append(contentsOf: result.dataPoints)
+            queryIssues.append(contentsOf: result.issues)
+            newAnchors.merge(result.newAnchors) { _, new in new }
         }
 
         if !cumulativeMetrics.isEmpty {
@@ -425,7 +566,140 @@ final class SyncEngine {
             queryIssues.append(contentsOf: aggregated.issues)
         }
 
-        return (dataPoints, queryIssues)
+        return QueryOutcome(dataPoints: dataPoints, issues: queryIssues, newAnchors: newAnchors)
+    }
+
+    /// Default cumulative query window when the destination doesn't supply one.
+    /// Last 3 days catches retroactive aggregation changes from late-arriving samples.
+    private func defaultCumulativeWindow(now: Date) -> QueryWindow {
+        let start = Calendar.current.date(byAdding: .day, value: -Self.cumulativeRollingLookbackDays, to: now) ?? now
+        return QueryWindow(start: start, end: now)
+    }
+
+    // MARK: Anchor Persistence
+
+    /// Loads stored anchor blobs for the given (destination, metrics) pairs from SwiftData.
+    private func loadAnchors(
+        for config: DestinationConfig,
+        metrics: Set<HealthMetricType>,
+        modelContext: ModelContext
+    ) -> [HealthMetricType: Data] {
+        let destinationID = config.id
+        let metricRawValues = Set(metrics.map(\.rawValue))
+        let descriptor = FetchDescriptor<MetricSyncAnchor>(
+            predicate: #Predicate<MetricSyncAnchor> { anchor in
+                anchor.destinationID == destinationID
+                    && metricRawValues.contains(anchor.metricRawValue)
+            }
+        )
+
+        guard let stored = try? modelContext.fetch(descriptor) else { return [:] }
+
+        var anchors: [HealthMetricType: Data] = [:]
+        for record in stored {
+            if let metric = record.metric {
+                anchors[metric] = record.anchorData
+            }
+        }
+        return anchors
+    }
+
+    /// Inserts or updates `MetricSyncAnchor` rows for the metrics that succeeded.
+    /// Caller is responsible for `try modelContext.save()` afterwards.
+    private func persistAnchors(
+        _ anchors: [HealthMetricType: Data],
+        for config: DestinationConfig,
+        modelContext: ModelContext
+    ) {
+        guard !anchors.isEmpty else { return }
+        let destinationID = config.id
+
+        for (metric, data) in anchors {
+            let metricRaw = metric.rawValue
+            let descriptor = FetchDescriptor<MetricSyncAnchor>(
+                predicate: #Predicate<MetricSyncAnchor> { anchor in
+                    anchor.destinationID == destinationID
+                        && anchor.metricRawValue == metricRaw
+                }
+            )
+
+            if let existing = try? modelContext.fetch(descriptor).first {
+                existing.anchorData = data
+                existing.lastUpdated = .now
+            } else {
+                let record = MetricSyncAnchor(destinationID: config.id, metric: metric, anchorData: data)
+                modelContext.insert(record)
+            }
+        }
+    }
+
+    // MARK: Bulk Defer
+
+    /// Records a deferred SyncRecord per applicable destination and returns a
+    /// SyncResult reflecting the deferred state. Used when the whole run is
+    /// blocked at the gate (locked device, offline) before any destination work
+    /// has started.
+    private func makeDeferredResult(
+        for destinations: [DestinationConfig],
+        modelContext: ModelContext,
+        isBackground: Bool,
+        reason: SyncFailure.DeferReason,
+        message: String,
+        startTime: Date
+    ) -> SyncResult {
+        var deferredCount = 0
+        var errors: [SyncDestinationError] = []
+
+        for config in destinations where !config.enabledMetrics.isEmpty {
+            // Background mode skips recently-synced destinations entirely.
+            if isBackground,
+               !config.needsFullSync,
+               let lastSynced = config.lastSyncedAt,
+               Date.now.timeIntervalSince(lastSynced) < config.syncFrequency.timeInterval * 0.9
+            {
+                continue
+            }
+            let record = makeRecord(for: config, startTime: startTime, isBackground: isBackground, modelContext: modelContext)
+            let failure = SyncFailure.deferred(reason: reason, message: message)
+            record.status = .deferred
+            record.applyFailure(failure)
+            record.duration = Date().timeIntervalSince(startTime)
+            deferredCount += 1
+            errors.append(SyncDestinationError(
+                destinationName: config.name,
+                errorDescription: message
+            ))
+        }
+
+        try? modelContext.save()
+
+        return SyncResult(
+            dataPointCount: 0,
+            processedDataPointCount: 0,
+            successfulDestinations: 0,
+            failedDestinations: 0,
+            deferredDestinations: deferredCount,
+            duration: Date().timeIntervalSince(startTime),
+            errors: errors
+        )
+    }
+
+    /// Inserts a fresh `.inProgress` SyncRecord for a destination.
+    private func makeRecord(
+        for config: DestinationConfig,
+        startTime: Date,
+        isBackground: Bool,
+        modelContext: ModelContext
+    ) -> SyncRecord {
+        let record = SyncRecord(
+            destinationName: config.name,
+            destinationID: config.id,
+            timestamp: startTime,
+            status: .inProgress,
+            isBackgroundSync: isBackground
+        )
+        modelContext.insert(record)
+        return record
     }
 
     // MARK: Record Retention
@@ -449,5 +723,15 @@ final class SyncEngine {
             logger.error("Failed to prune old sync records: \(error.localizedDescription)")
         }
     }
+}
 
+// MARK: - AlwaysReachableNetworkMonitor
+
+/// Test-only `NetworkPathMonitoring` that always reports reachable.
+/// Used as the default in `SyncEngine.init(healthKitReader:...)` so existing
+/// tests don't need to know about reachability.
+struct AlwaysReachableNetworkMonitor: NetworkPathMonitoring {
+    var isReachable: Bool {
+        true
+    }
 }
