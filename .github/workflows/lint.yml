@@ -115,7 +115,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install yamllint
-        run: pip install --user yamllint==1.38.0
+        run: pip install --user --require-hashes -r .github/requirements/yamllint.txt
 
       - name: yamllint
         run: yamllint -c .yamllint.yaml .
