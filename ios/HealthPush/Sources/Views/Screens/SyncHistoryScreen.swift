@@ -1,4 +1,3 @@
-import Charts
 import SwiftData
 import SwiftUI
 
@@ -21,6 +20,7 @@ struct SyncHistoryScreen: View {
     var initialRecordID: UUID?
 
     @State private var selectedFilter: SyncHistoryFilter = .all
+    @State private var selectedDestinationName: String?
     @State private var searchText = ""
     @State private var selectedChartDay: Date?
     @State private var navigationPath: [UUID] = []
@@ -29,82 +29,49 @@ struct SyncHistoryScreen: View {
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            Group {
-                if filteredRecords.isEmpty {
-                    emptyState
-                } else {
-                    recordList
-                }
-            }
-            .navigationTitle("Sync History")
-            .navigationBarTitleDisplayMode(.inline)
-            .onAppear {
-                if let initialRecordID, navigationPath.isEmpty {
-                    navigationPath.append(initialRecordID)
-                }
-            }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Picker("Filter", selection: $selectedFilter) {
-                            ForEach(SyncHistoryFilter.allCases) { filter in
-                                Label(filter.displayName, systemImage: filter.icon)
-                                    .tag(filter)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: selectedFilter == .all
-                            ? "line.3.horizontal.decrease.circle"
-                            : "line.3.horizontal.decrease.circle.fill"
-                        )
+            recordList
+                .navigationTitle("Sync History")
+                .navigationBarTitleDisplayMode(.inline)
+                .onAppear {
+                    if let initialRecordID, navigationPath.isEmpty {
+                        navigationPath.append(initialRecordID)
                     }
-                    .accessibilityLabel("Filter")
-                    .accessibilityValue(selectedFilter.displayName)
-                    .accessibilityHint("Filter sync history by status")
                 }
-            }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
         }
     }
 
     // MARK: Subviews
 
-    private var emptyState: some View {
-        ContentUnavailableView {
-            Label("No Sync History", systemImage: "clock.arrow.circlepath")
-        } description: {
-            if selectedFilter == .all && searchText.isEmpty {
-                Text("Sync history will appear here after your first sync.")
-            } else {
-                Text("No syncs match the selected filter or search.")
-            }
-        }
-    }
-
     private var recordList: some View {
         List {
-            if !chartData.isEmpty {
-                chartSection
+            if !heatmapDays.isEmpty {
+                heatmapSection
             }
 
-            if selectedChartDay != nil {
-                Section {
-                    Button {
-                        withAnimation { selectedChartDay = nil }
-                    } label: {
-                        Label("Clear Day Filter", systemImage: "xmark.circle")
-                    }
-                }
+            filterPillsSection
+
+            // Day-filter affordance. Lives outside `recordList`'s conditional
+            // sections so it stays reachable even when the selected day has
+            // zero records — otherwise tapping a quiet cell would strand the
+            // user with an empty list and no way back.
+            if let selectedDay = selectedChartDay {
+                selectedDayBanner(selectedDay)
             }
 
-            ForEach(groupedByDate, id: \.key) { dateKey, records in
-                Section(dateKey) {
-                    ForEach(records) { record in
-                        NavigationLink(value: record.id) {
-                            SyncRecordRow(record: record)
+            if filteredRecords.isEmpty {
+                emptyStateSection
+            } else {
+                ForEach(groupedByDate, id: \.key) { dateKey, records in
+                    Section(dateKey) {
+                        ForEach(records) { record in
+                            NavigationLink(value: record.id) {
+                                SyncRecordRow(record: record)
+                            }
                         }
                     }
                 }
@@ -119,53 +86,119 @@ struct SyncHistoryScreen: View {
         }
     }
 
-    private var chartSection: some View {
-        Section("Syncs Per Day") {
-            Chart(chartData) { entry in
-                BarMark(
-                    x: .value("Date", entry.date, unit: .day),
-                    y: .value("Count", entry.count)
-                )
-                .foregroundStyle(by: .value("Destination", entry.destinationName))
-            }
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .day)) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: .dateTime.weekday(.abbreviated), centered: true)
-                }
-            }
-            .chartOverlay { proxy in
-                GeometryReader { geometry in
-                    Rectangle()
-                        .fill(.clear)
-                        .contentShape(Rectangle())
-                        .onTapGesture { location in
-                            handleChartTap(at: location, proxy: proxy, geometry: geometry)
+    private var filterPillsSection: some View {
+        Section {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: HP.Spacing.md) {
+                    ForEach(SyncHistoryFilter.allCases) { filter in
+                        FilterPill(
+                            title: filter.displayName,
+                            icon: filter.icon,
+                            isActive: selectedFilter == filter
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                selectedFilter = filter
+                            }
                         }
+                    }
+
+                    // Per-destination pills appear only when there's more than
+                    // one destination in the history — otherwise they're just
+                    // noise duplicating the "All" state.
+                    if destinationNames.count > 1 {
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.1))
+                            .frame(width: 0.5, height: 20)
+                            .padding(.horizontal, HP.Spacing.xs)
+
+                        ForEach(destinationNames, id: \.self) { name in
+                            FilterPill(
+                                title: name,
+                                icon: nil,
+                                isActive: selectedDestinationName == name
+                            ) {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    selectedDestinationName = selectedDestinationName == name ? nil : name
+                                }
+                            }
+                        }
+                    }
                 }
+                .padding(.horizontal, HP.Spacing.xl)
+                .padding(.vertical, HP.Spacing.sm)
             }
-            .frame(height: 200)
-            .padding(.vertical, HP.Spacing.xs)
-            .accessibilityLabel("Stacked bar chart showing syncs per day by destination")
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
         }
     }
 
-    // MARK: Chart Interaction
+    /// Distinct destination names present in the current record set, sorted so
+    /// the pill order is stable across renders.
+    private var destinationNames: [String] {
+        Set(syncRecords.map(\.destinationName)).sorted()
+    }
 
-    private func handleChartTap(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
-        let plotFrame = geometry[proxy.plotFrame!]
-        let relativeX = location.x - plotFrame.origin.x
-
-        guard let tappedDate: Date = proxy.value(atX: relativeX) else { return }
-        let calendar = Calendar.current
-        let tappedDay = calendar.startOfDay(for: tappedDate)
-
-        withAnimation {
-            if selectedChartDay == tappedDay {
-                selectedChartDay = nil
-            } else {
-                selectedChartDay = tappedDay
+    private func selectedDayBanner(_ day: Date) -> some View {
+        Section {
+            Button {
+                withAnimation { selectedChartDay = nil }
+            } label: {
+                HStack {
+                    Label {
+                        Text("Filtered to ") + Text(day, style: .date).fontWeight(.semibold)
+                    } icon: {
+                        Image(systemName: "calendar")
+                    }
+                    Spacer()
+                    Text("Clear")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.tint)
+                }
             }
+            .accessibilityHint("Removes the selected-day filter")
+        }
+    }
+
+    private var emptyStateSection: some View {
+        Section {
+            ContentUnavailableView {
+                Label(emptyTitle, systemImage: "clock.arrow.circlepath")
+            } description: {
+                Text(emptyMessage)
+            }
+            .listRowBackground(Color.clear)
+        }
+    }
+
+    private var emptyTitle: String {
+        if selectedChartDay != nil { return "No Syncs That Day" }
+        return "No Sync History"
+    }
+
+    private var emptyMessage: String {
+        if selectedChartDay != nil {
+            return "Tap the heatmap above to pick a different day, or clear the filter."
+        }
+        if selectedFilter == .all && searchText.isEmpty {
+            return "Sync history will appear here after your first sync."
+        }
+        return "No syncs match the selected filter or search."
+    }
+
+    private var heatmapSection: some View {
+        Section {
+            ActivityHeatmap(
+                days: heatmapDays,
+                onDayTapped: { day in
+                    withAnimation {
+                        let startOfDay = Calendar.current.startOfDay(for: day.date)
+                        selectedChartDay = selectedChartDay == startOfDay ? nil : startOfDay
+                    }
+                },
+                selectedDay: selectedChartDay
+            )
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
         }
     }
 
@@ -183,6 +216,10 @@ struct SyncHistoryScreen: View {
             syncRecords.filter { $0.status == .failure || $0.status == .partialFailure }
         case .background:
             syncRecords.filter(\.isBackgroundSync)
+        }
+
+        if let name = selectedDestinationName {
+            records = records.filter { $0.destinationName == name }
         }
 
         if !searchText.isEmpty {
@@ -223,45 +260,81 @@ struct SyncHistoryScreen: View {
             }
     }
 
-    // MARK: Chart Data
+    // MARK: Heatmap Data
 
-    private var chartData: [SyncChartEntry] {
+    /// 90-day activity buckets used by ``ActivityHeatmap``. Oldest day first.
+    ///
+    /// The calendar walk runs unconditionally so the heatmap always renders a
+    /// full 90-cell grid even on weeks without syncs — the empty cells are the
+    /// point of a heatmap.
+    private var heatmapDays: [ActivityHeatmapDay] {
         let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
 
-        // Only chart the last 7 days of records
-        let sevenDaysAgo = calendar.startOfDay(for: calendar.date(byAdding: .day, value: -6, to: .now) ?? .now)
-        let recentRecords = syncRecords.filter { $0.timestamp >= sevenDaysAgo }
-
-        guard !recentRecords.isEmpty else { return [] }
-
-        let grouped = Dictionary(grouping: recentRecords) { record -> String in
+        // Bucket records by startOfDay so the lookup per day is O(1).
+        var successByDay: [Date: Int] = [:]
+        var failureByDay: [Date: Int] = [:]
+        for record in syncRecords {
             let day = calendar.startOfDay(for: record.timestamp)
-            return "\(day.timeIntervalSince1970)|\(record.destinationName)"
+            switch record.status {
+            case .success, .deferred:
+                successByDay[day, default: 0] += 1
+            case .failure, .partialFailure:
+                failureByDay[day, default: 0] += 1
+            case .inProgress:
+                continue
+            }
         }
 
-        return grouped.map { _, records in
-            let first = records[0]
-            let day = calendar.startOfDay(for: first.timestamp)
-            return SyncChartEntry(
-                date: day,
-                destinationName: first.destinationName,
-                count: records.count
+        return (0..<90).compactMap { offset -> ActivityHeatmapDay? in
+            guard let date = calendar.date(byAdding: .day, value: -(89 - offset), to: today) else {
+                return nil
+            }
+            return ActivityHeatmapDay(
+                date: date,
+                successCount: successByDay[date] ?? 0,
+                failureCount: failureByDay[date] ?? 0
             )
         }
-        .sorted { $0.date < $1.date }
     }
 }
 
-// MARK: - SyncChartEntry
+// MARK: - FilterPill
 
-/// A single data point for the sync history chart.
-struct SyncChartEntry: Identifiable {
-    let date: Date
-    let destinationName: String
-    let count: Int
+/// A horizontally-scrolling filter pill used on the sync history screen.
+///
+/// Active pills use the label's foreground color (high contrast against the
+/// filled capsule), inactive pills use an ultra-thin material so they fade
+/// behind the heatmap above without disappearing entirely.
+private struct FilterPill: View {
+    let title: String
+    let icon: String?
+    let isActive: Bool
+    let action: () -> Void
 
-    var id: String {
-        "\(date.timeIntervalSince1970)-\(destinationName)"
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: HP.Spacing.xs) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.caption2.weight(.semibold))
+                }
+                Text(title)
+                    .font(.footnote.weight(.semibold))
+            }
+            .padding(.horizontal, HP.Spacing.lgXl)
+            .padding(.vertical, HP.Spacing.md)
+            .background {
+                Capsule().fill(isActive ? AnyShapeStyle(Color.primary) : AnyShapeStyle(.ultraThinMaterial))
+            }
+            .overlay {
+                Capsule()
+                    .strokeBorder(isActive ? Color.clear : Color.primary.opacity(0.08), lineWidth: 0.5)
+            }
+            .foregroundStyle(isActive ? AnyShapeStyle(Color(.systemBackground)) : AnyShapeStyle(.primary))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 }
 
@@ -322,11 +395,12 @@ struct SyncRecordRow: View {
 
                 HStack(spacing: HP.Spacing.md) {
                     Text("\(record.dataPointCount) points")
-                        .font(.caption)
+                        .font(.caption.monospaced())
+                        .monospacedDigit()
                         .foregroundStyle(.secondary)
 
                     Text(formattedDuration)
-                        .font(.caption)
+                        .font(.caption.monospaced())
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -334,7 +408,8 @@ struct SyncRecordRow: View {
             Spacer()
 
             Text(record.timestamp, style: .time)
-                .font(.caption)
+                .font(.caption.monospaced())
+                .monospacedDigit()
                 .foregroundStyle(.tertiary)
         }
         .accessibilityElement(children: .combine)

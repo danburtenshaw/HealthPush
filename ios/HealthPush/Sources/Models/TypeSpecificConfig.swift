@@ -66,7 +66,7 @@ struct S3TypeConfig: Codable, Equatable, Sendable {
     var syncStartDateCustom: Date?
 
     var exportFormat: ExportFormat {
-        get { ExportFormat(rawValue: exportFormatRaw) ?? .json }
+        get { ExportFormat(rawValue: exportFormatRaw) ?? .ndjson }
         set { exportFormatRaw = newValue.rawValue }
     }
 

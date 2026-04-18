@@ -39,4 +39,18 @@ enum SyncFrequency: String, CaseIterable, Codable, Identifiable {
         case .twentyFourHours: "Every 24 Hours"
         }
     }
+
+    /// Short form for dense UI (destination card, trust strips).
+    /// Reads as a cadence ("15m", "1h", "24h") rather than a sentence.
+    var compactDisplayName: String {
+        switch self {
+        case .fifteenMinutes: "15m"
+        case .thirtyMinutes: "30m"
+        case .oneHour: "1h"
+        case .threeHours: "3h"
+        case .sixHours: "6h"
+        case .twelveHours: "12h"
+        case .twentyFourHours: "24h"
+        }
+    }
 }

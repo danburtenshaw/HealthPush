@@ -47,15 +47,17 @@ struct DashboardScreen: View {
                         // No destinations — guide the user to set one up
                         emptyDestinationsPrompt
                     } else {
-                        // Status card — derives sync time and overdue status
-                        // from per-destination timestamps, not AppState.lastSyncTime.
-                        SyncStatusCard(
+                        // Compact 3-cell status spine — last sync, next sync,
+                        // destination health. Takes the place of the taller
+                        // SyncStatusCard so the 7-day activity card can sit
+                        // above the fold on most devices.
+                        TrustStrip(
+                            lastSyncDate: aggregateLastSyncDate,
+                            nextSyncDate: aggregateNextSyncDate,
+                            destinationCount: destinationManager.destinations.filter(\.isEnabled).count,
+                            healthyCount: healthyDestinationCount,
                             isSyncing: appState.isSyncing,
-                            lastSyncTime: aggregateLastSyncFormatted,
-                            dataPointsSyncedToday: appState.dataPointsSyncedToday,
-                            totalSyncsCompleted: appState.totalSyncsCompleted,
-                            isSyncOverdue: isAnyDestinationOverdue,
-                            hasSyncIssues: latestIssueRecord != nil
+                            hasIssues: latestIssueRecord != nil || isAnyDestinationOverdue
                         )
 
                         // Single prioritized nudge slot replaces individual banners
@@ -78,6 +80,9 @@ struct DashboardScreen: View {
 
                         // Destinations section
                         destinationsSection
+
+                        // 7-day sparkline — always visible once there's a destination
+                        sevenDayActivitySection
 
                         // Recent activity
                         if !recentSyncs.isEmpty {
@@ -410,6 +415,52 @@ struct DashboardScreen: View {
         .frame(maxWidth: .infinity)
     }
 
+    private var sevenDayActivitySection: some View {
+        let totals = sevenDayTotals
+        return VStack(alignment: .leading, spacing: HP.Spacing.lg) {
+            HStack {
+                Text("Last 7 days")
+                    .font(.title3.weight(.semibold))
+                Spacer()
+                Button("See all") {
+                    showingSyncHistory = true
+                }
+                .font(.subheadline)
+            }
+
+            DataPointsSparkline(
+                dailyTotals: totals.counts,
+                weekdayLabels: totals.labels
+            )
+        }
+    }
+
+    /// 7-day buckets of data points synced, oldest-first, plus short weekday
+    /// labels. Today is always the final entry.
+    private var sevenDayTotals: (counts: [Int], labels: [String]) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let days = (0..<7)
+            .compactMap { calendar.date(byAdding: .day, value: -(6 - $0), to: today) }
+
+        // Match each day to the sum of dataPointCount for records on that day.
+        var counts: [Int] = []
+        var labels: [String] = []
+        let labelFormatter = DateFormatter()
+        labelFormatter.locale = Locale(identifier: "en_US_POSIX")
+        labelFormatter.setLocalizedDateFormatFromTemplate("EEE")
+
+        for day in days {
+            let next = calendar.date(byAdding: .day, value: 1, to: day) ?? day
+            let total = allSyncs
+                .filter { $0.timestamp >= day && $0.timestamp < next && $0.status == .success }
+                .reduce(0) { $0 + $1.dataPointCount }
+            counts.append(total)
+            labels.append(labelFormatter.string(from: day))
+        }
+        return (counts, labels)
+    }
+
     private var recentActivitySection: some View {
         VStack(alignment: .leading, spacing: HP.Spacing.lg) {
             HStack {
@@ -515,6 +566,31 @@ struct DashboardScreen: View {
             .max()
     }
 
+    /// The soonest `nextSyncTime` across all enabled destinations. Destinations
+    /// that have never synced contribute nothing — the TrustStrip falls back to
+    /// "—" in that case, which reads correctly next to "never" on the left cell.
+    private var aggregateNextSyncDate: Date? {
+        destinationManager.destinations
+            .filter(\.isEnabled)
+            .compactMap(\.nextSyncTime)
+            .min()
+    }
+
+    /// Count of enabled destinations whose latest sync record isn't a failure.
+    /// Mirrors the "issue" detection in ``latestIssueRecord`` but per-destination
+    /// so the TrustStrip can render "1/2 healthy" rather than a boolean.
+    private var healthyDestinationCount: Int {
+        let enabled = destinationManager.destinations.filter(\.isEnabled)
+        var failing: Set<UUID> = []
+        for destination in enabled {
+            if let latest = allSyncs.first(where: { $0.destinationID == destination.id }),
+               latest.status == .failure || latest.status == .partialFailure {
+                failing.insert(destination.id)
+            }
+        }
+        return enabled.count - failing.count
+    }
+
     /// Formatted string for the most recent sync time across all destinations.
     private var aggregateLastSyncFormatted: String {
         guard let date = aggregateLastSyncDate else { return "Never" }
@@ -589,7 +665,8 @@ private struct RecentSyncRow: View {
                     .font(.subheadline.weight(.medium))
 
                 Text("\(record.dataPointCount) data points")
-                    .font(HP.Typography.caption)
+                    .font(HP.Typography.caption.monospaced())
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText())
                     .animation(.default, value: record.dataPointCount)
@@ -598,7 +675,8 @@ private struct RecentSyncRow: View {
             Spacer()
 
             Text(record.timestamp, style: .relative)
-                .font(HP.Typography.caption)
+                .font(HP.Typography.caption.monospaced())
+                .monospacedDigit()
                 .foregroundStyle(.tertiary)
         }
         .padding(.vertical, HP.Spacing.sm)

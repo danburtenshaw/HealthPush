@@ -51,43 +51,58 @@ struct DestinationCard: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Text("  \(config.enabledMetrics.count) metrics")
+                    Text("·")
                         .font(.caption)
+                        .foregroundStyle(.tertiary)
+
+                    Text("\(config.enabledMetrics.count) metrics")
+                        .font(.caption.monospaced())
+                        .monospacedDigit()
                         .foregroundStyle(.tertiary)
                 }
 
-                HStack(spacing: HP.Spacing.sm) {
-                    Image(systemName: "clock.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                // Cadence + next sync share a row but as separate, compact
+                // chips — "Every 15 Minutes" on the left next to "Next: 4m
+                // from now" wraps awkwardly on smaller phones, so we shorten
+                // both to their compact forms and give each its own chip.
+                HStack(spacing: HP.Spacing.md) {
+                    Label(config.syncFrequency.compactDisplayName, systemImage: "clock.fill")
+                        .labelStyle(.titleAndIcon)
+                        .font(.caption2.weight(.semibold))
                         .symbolRenderingMode(.hierarchical)
-                    Text(config.syncFrequency.displayName)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Syncs \(config.syncFrequency.displayName.lowercased())")
 
                     if let nextSync = config.nextSyncTime {
                         if nextSync < Date.now {
-                            Text("  Overdue")
-                                .font(.caption)
+                            Text("Overdue")
+                                .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.orange)
+                                .padding(.horizontal, HP.Spacing.md)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.14), in: Capsule())
                         } else {
-                            Text("  Next: \(nextSync, style: .relative)")
-                                .font(.caption)
+                            (Text("next ") + Text(nextSync, style: .relative))
+                                .font(.caption2.monospaced())
+                                .monospacedDigit()
                                 .foregroundStyle(.tertiary)
+                                .lineLimit(1)
                                 .accessibilityLabel("Next sync: \(nextSync.formatted(date: .abbreviated, time: .shortened))")
                         }
                     }
                 }
 
                 syncSummaryView
-                    .font(.caption2)
+                    .font(.caption2.monospaced())
+                    .monospacedDigit()
                     .foregroundStyle(syncSummaryColor)
 
                 if let urlText = sanitizedURL, !urlText.isEmpty {
                     Text(urlText)
-                        .font(.caption2)
+                        .font(.caption2.monospaced())
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                 }
             }
 

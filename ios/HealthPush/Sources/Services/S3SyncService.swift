@@ -49,7 +49,6 @@ struct S3SyncService {
 
         let grouped = exporter.groupByDateAndMetric(data)
         let totalFiles = grouped.count
-        let ext = exportFormat == .csv ? "csv" : "jsonl"
 
         var completed = 0
         var totalNewOrUpdated = 0
@@ -60,7 +59,7 @@ struct S3SyncService {
                 prefix: pathPrefix,
                 dateString: key.dateString,
                 metricType: key.metricType,
-                ext: ext
+                format: exportFormat
             )
 
             let newCount = try await syncFile(key: objectKey, newPoints: points)
@@ -109,11 +108,10 @@ struct S3SyncService {
             format: exportFormat
         )
 
-        let contentType = exportFormat == .csv ? "text/csv" : "application/x-ndjson"
         try await s3Client.putObject(
             key: key,
             data: result.data,
-            contentType: contentType
+            contentType: exportFormat.contentType
         )
 
         return result.newCount
@@ -124,6 +122,8 @@ struct S3SyncService {
         let existing: [HealthDataPoint] = if let data = existingData {
             switch exportFormat {
             case .json:
+                (try? exporter.decodeJSON(data)) ?? []
+            case .ndjson:
                 exporter.decodeNDJSON(data)
             case .csv:
                 exporter.decodeCSV(data)

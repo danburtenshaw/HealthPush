@@ -244,6 +244,8 @@ struct HealthDataExporter {
         let existing: [HealthDataPoint] = if let data = existingData {
             switch format {
             case .json:
+                (try? decodeJSON(data)) ?? []
+            case .ndjson:
                 decodeNDJSON(data)
             case .csv:
                 decodeCSV(data)
@@ -256,6 +258,8 @@ struct HealthDataExporter {
 
         let encoded: Data = switch format {
         case .json:
+            try encodeJSON(merged.points)
+        case .ndjson:
             try encodeNDJSON(merged.points)
         case .csv:
             encodeCSV(merged.points)
@@ -268,19 +272,20 @@ struct HealthDataExporter {
 
     /// Builds a v1 storage key/path for a date/metric combination.
     ///
-    /// Layout: `{prefix}/v1/{metric.key}/{YYYY}/{MM}/{DD}/data.jsonl`
+    /// Layout: `{prefix}/v1/{metric.key}/{YYYY}/{MM}/{DD}/data.{ext}`
     ///
     /// - Parameters:
     ///   - prefix: User-configured path prefix (may be empty).
     ///   - dateString: The date string (YYYY-MM-DD).
     ///   - metricType: The health metric type.
-    ///   - ext: File extension (ignored in v1 layout; kept for API compatibility).
+    ///   - ext: File extension — typically the export format's `fileExtension`
+    ///          (e.g. `jsonl`, `json`, `csv`). Legacy callers may pass any string.
     /// - Returns: The full key path.
     static func buildKey(prefix: String, dateString: String, metricType: HealthMetricType, ext: String) -> String {
+        let fileExt = ext.isEmpty ? "jsonl" : ext
+        let fileName = "data.\(fileExt)"
         let parts = dateString.split(separator: "-")
         guard parts.count == 3 else {
-            // Fallback for malformed date strings
-            let fileName = "data.jsonl"
             if prefix.isEmpty {
                 return "v1/\(metricType.fileStem)/\(dateString)/\(fileName)"
             }
@@ -290,12 +295,16 @@ struct HealthDataExporter {
         let year = parts[0]
         let month = parts[1]
         let day = parts[2]
-        let fileName = "data.jsonl"
 
         if prefix.isEmpty {
             return "v1/\(metricType.fileStem)/\(year)/\(month)/\(day)/\(fileName)"
         }
         return "\(prefix)/v1/\(metricType.fileStem)/\(year)/\(month)/\(day)/\(fileName)"
+    }
+
+    /// Convenience overload that derives the file extension from an ``ExportFormat``.
+    static func buildKey(prefix: String, dateString: String, metricType: HealthMetricType, format: ExportFormat) -> String {
+        buildKey(prefix: prefix, dateString: dateString, metricType: metricType, ext: format.fileExtension)
     }
 
     // MARK: - Manifest

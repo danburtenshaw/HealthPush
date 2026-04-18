@@ -27,7 +27,7 @@ struct S3SetupScreen: View {
     @State private var hasStoredAccessKeyID = false
     @State private var hasStoredSecretAccessKey = false
     @State private var pathPrefix = ""
-    @State private var exportFormat: ExportFormat = .json
+    @State private var exportFormat: ExportFormat = .ndjson
     @State private var enabledMetrics: Set<HealthMetricType> = Set(HealthMetricType.allCases)
     @State private var syncFrequency: SyncFrequency = .oneHour
     @State private var syncStartDateOption: SyncStartDateOption = .last7Days
@@ -215,6 +215,7 @@ struct S3SetupScreen: View {
             } label: {
                 Label("Format", systemImage: "doc.text.fill")
             }
+            .pickerStyle(.segmented)
         } header: {
             Text("Storage")
         } footer: {
@@ -222,7 +223,7 @@ struct S3SetupScreen: View {
                 Text(error)
                     .foregroundStyle(.red)
             } else {
-                Text("Files stored as \(examplePath). Leave empty for bucket root.")
+                Text("\(exportFormat.subtitle). Files stored as \(examplePath).")
             }
         }
     }
@@ -429,8 +430,7 @@ struct S3SetupScreen: View {
 
     private var examplePath: String {
         let prefix = pathPrefix.isEmpty ? "" : "\(pathPrefix)/"
-        let ext = exportFormat == .csv ? "csv" : "json"
-        return "\(prefix)2026-04-03/heart_rate.\(ext)"
+        return "\(prefix)v1/heart_rate/2026/04/03/data.\(exportFormat.fileExtension)"
     }
 
     // MARK: Data Loading

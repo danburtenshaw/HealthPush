@@ -212,13 +212,28 @@ struct HealthDataExporterTests {
 
     // MARK: Full Pipeline
 
-    @Test("mergeAndEncode with JSON format produces valid NDJSON output")
+    @Test("mergeAndEncode with JSON format produces a valid JSON array")
     func mergeAndEncodeJSON() throws {
         let point = makePoint()
         let result = try exporter.mergeAndEncode(
             existingData: nil,
             incoming: [point],
             format: .json
+        )
+
+        #expect(result.newCount == 1)
+        let decoded = try exporter.decodeJSON(result.data)
+        #expect(decoded.count == 1)
+        #expect(decoded[0].id == point.id)
+    }
+
+    @Test("mergeAndEncode with NDJSON format produces valid newline-delimited output")
+    func mergeAndEncodeNDJSON() throws {
+        let point = makePoint()
+        let result = try exporter.mergeAndEncode(
+            existingData: nil,
+            incoming: [point],
+            format: .ndjson
         )
 
         #expect(result.newCount == 1)
