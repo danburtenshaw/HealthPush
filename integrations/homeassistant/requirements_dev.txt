@@ -2726,9 +2726,9 @@ pyobjc-framework-libdispatch==12.1 ; sys_platform == 'darwin' \
     --hash=sha256:954cc2d817b71383bd267cc5cd27d83536c5f879539122353ca59f1c945ac706 \
     --hash=sha256:e9f49517e253716e40a0009412151f527005eec0b9a2311ac63ecac1bdf02332
     # via bleak
-pyopenssl==25.3.0 ; python_full_version < '3.14.2' \
-    --hash=sha256:1fda6fc034d5e3d179d39e59c1895c9faeaf40a79de5fc4cbbfbe0d36f4a77b6 \
-    --hash=sha256:c981cb0a3fd84e8602d7afc209522773b94c1c2446a3c710a75b06fe1beae329
+pyOpenSSL==26.0.0; python_full_version < '3.14.2' \
+    --hash=sha256:df94d28498848b98cc1c0ffb8ef1e71e40210d3b0a8064c9d29571ed2904bf81 \
+    --hash=sha256:f293934e52936f2e3413b89c6ce36df66a0b34ae1ea3a053b8c5020ff2f513fc
     # via
     #   acme
     #   homeassistant
