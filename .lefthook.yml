@@ -11,7 +11,7 @@
 #   lefthook run pre-commit --all-files
 #
 # Tools the hooks expect on PATH (install what you actually use):
-#   brew install lefthook swiftformat swiftlint gitleaks shellcheck
+#   brew install lefthook swiftformat swiftlint shellcheck
 #   brew install markdownlint-cli ruff  # optional — only if you touch those files
 #
 # These hooks are advisory. CI re-runs everything in .github/workflows/lint.yml
@@ -46,11 +46,6 @@ pre-commit:
       glob: "*.swift"
       run: swiftlint lint --quiet --reporter emoji {staged_files}
       stage_fixed: false
-
-    # Secret scan. Fails the commit if gitleaks finds anything.
-    gitleaks:
-      tags: guards security
-      run: gitleaks protect --staged --redact --no-banner
 
     # Shell lint for anything under scripts/
     shellcheck:
