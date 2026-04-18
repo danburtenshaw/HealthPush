@@ -28,6 +28,10 @@
       "enabled": false
     },
     {
+      "matchManagers": ["github-actions"],
+      "minimumReleaseAge": "0 days"
+    },
+    {
       "matchManagers": ["swift"],
       "addLabels": ["swift"]
     },
