@@ -31,23 +31,57 @@ def _coerce_numeric(raw: Any) -> float | int | None:
         return None
 
     if isinstance(raw, (int, float)):
-        if not math.isfinite(raw):
-            return None
-        return raw
+        return raw if math.isfinite(raw) else None
 
-    if isinstance(raw, str):
-        try:
-            value = float(raw)
-        except (ValueError, OverflowError):
-            return None
-        if not math.isfinite(value):
-            return None
-        # Preserve int representation when the string has no fractional part.
-        if value == int(value) and "." not in raw:
-            return int(value)
-        return value
+    if not isinstance(raw, str):
+        return None
 
-    return None
+    try:
+        value = float(raw)
+    except (ValueError, OverflowError):
+        return None
+
+    if not math.isfinite(value):
+        return None
+
+    # Preserve int representation when the string has no fractional part.
+    if value == int(value) and "." not in raw:
+        value = int(value)
+    return value
+
+
+def _validate_metric(metric: Any) -> dict[str, Any] | None:
+    """Validate a single metric entry; return the sanitized dict, or ``None``."""
+    if not isinstance(metric, dict):
+        return None
+
+    raw_type = metric.get("type")
+    if not isinstance(raw_type, str):
+        return None
+    if len(raw_type) > _MAX_TYPE_LENGTH:
+        _LOGGER.debug(
+            "HealthPush metric skipped: type key exceeds %d chars",
+            _MAX_TYPE_LENGTH,
+        )
+        return None
+
+    raw_value = metric.get("value")
+    if raw_value is None:
+        return None
+
+    coerced_value = _coerce_numeric(raw_value)
+    if coerced_value is None:
+        _LOGGER.debug(
+            "HealthPush metric skipped: non-numeric or non-finite value for type '%s'",
+            raw_type[:_MAX_TYPE_LENGTH],
+        )
+        return None
+
+    validated: dict[str, Any] = {**metric, "value": coerced_value}
+    for field in _CLAMPED_STRING_FIELDS:
+        if field in validated and isinstance(validated[field], str):
+            validated[field] = validated[field][:_MAX_STRING_FIELD_LENGTH]
+    return validated
 
 
 def extract_valid_metrics(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -67,46 +101,12 @@ def extract_valid_metrics(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
     valid_metrics: list[dict[str, Any]] = []
     for metric in metrics:
-        if not isinstance(metric, dict):
+        validated = _validate_metric(metric)
+        if validated is None:
             continue
-
-        # ── Required keys ────────────────────────────────────────────
-        raw_type = metric.get("type")
-        if raw_type is None or not isinstance(raw_type, str):
-            continue
-        if len(raw_type) > _MAX_TYPE_LENGTH:
-            _LOGGER.debug(
-                "HealthPush metric skipped: type key exceeds %d chars",
-                _MAX_TYPE_LENGTH,
-            )
-            continue
-
-        raw_value = metric.get("value")
-        if raw_value is None:
-            continue
-
-        coerced_value = _coerce_numeric(raw_value)
-        if coerced_value is None:
-            _LOGGER.debug(
-                "HealthPush metric skipped: non-numeric or non-finite value for type '%s'",
-                raw_type[:_MAX_TYPE_LENGTH],
-            )
-            continue
-
-        # ── Build validated metric ───────────────────────────────────
-        validated: dict[str, Any] = {
-            **metric,
-            "value": coerced_value,
-        }
-
-        # Clamp optional string fields.
-        for field in _CLAMPED_STRING_FIELDS:
-            if field in validated and isinstance(validated[field], str):
-                validated[field] = validated[field][:_MAX_STRING_FIELD_LENGTH]
 
         valid_metrics.append(validated)
 
-        # ── Cap total metrics ────────────────────────────────────────
         if len(valid_metrics) >= _MAX_METRICS_PER_PAYLOAD:
             _LOGGER.warning(
                 "HealthPush payload truncated: more than %d metrics received",
