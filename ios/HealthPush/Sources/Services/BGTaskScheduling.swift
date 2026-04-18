@@ -10,7 +10,7 @@ import Foundation
 /// inject a fake that records `submit` calls and lets us drive task handlers
 /// synchronously.
 @MainActor
-protocol BGTaskScheduling: AnyObject, Sendable {
+protocol BGTaskScheduling: AnyObject {
     /// Submits a `BGTaskRequest` to the scheduler. Throws on invalid identifier
     /// or unmet preconditions.
     func submit(_ request: BGTaskRequest) throws
