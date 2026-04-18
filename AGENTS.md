@@ -137,6 +137,28 @@ cp -r integrations/homeassistant/custom_components/healthpush \
   ~/.homeassistant/custom_components/
 ```
 
+#### Regenerating Python lockfiles
+
+The HA integration uses `pip-compile`-style lockfiles managed via [`uv`](https://docs.astral.sh/uv/). The `.in` files are the human-edited source; the `.txt` files are generated and checked in.
+
+- `integrations/homeassistant/requirements_dev.in` — HA + dev tooling source. CI runs Linux, but `homeassistant` pulls `bleak` which has macOS-only `pyobjc-*` transitives when compiled on darwin. **Always pass `--python-platform x86_64-unknown-linux-gnu`**, otherwise CI fails with `PyObjC requires macOS to build`:
+
+  ```bash
+  uv pip compile integrations/homeassistant/requirements_dev.in \
+    --python-version 3.14.2 \
+    --python-platform x86_64-unknown-linux-gnu \
+    --output-file integrations/homeassistant/requirements_dev.txt
+  ```
+
+- `integrations/homeassistant/requirements_test.in` (hash-pinned) and `.github/requirements/yamllint.in` (hash-pinned) — pure-Python trees, no platform flag needed. Regenerate with `--generate-hashes`:
+
+  ```bash
+  uv pip compile <file>.in --generate-hashes --python-version 3.14.2 \
+    --output-file <file>.txt
+  ```
+
+Renovate keeps all three `.txt` lockfiles current automatically; manual regeneration is only needed when adding, removing, or upgrading direct deps in the `.in` files.
+
 ### Running Tests
 
 ```bash
