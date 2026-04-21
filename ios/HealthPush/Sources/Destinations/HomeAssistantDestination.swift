@@ -85,8 +85,9 @@ struct HomeAssistantDestination: SyncDestination {
         return QueryWindow(start: start, end: now)
     }
 
-    func cumulativeQueryWindow(lastSyncedAt: Date?, now: Date) -> QueryWindow? {
-        // HA sends the full day's cumulative total ("8,432 steps today")
+    func cumulativeQueryWindow(lastSyncedAt: Date?, needsFullSync: Bool, now: Date) -> QueryWindow? {
+        // HA sends the full day's cumulative total ("8,432 steps today"), so
+        // backfilling history via the webhook makes no sense — always start-of-day.
         QueryWindow(start: Calendar.current.startOfDay(for: now), end: now)
     }
 

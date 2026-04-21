@@ -59,9 +59,12 @@ protocol SyncDestination: Identifiable, Sendable {
     ///
     /// - Parameters:
     ///   - lastSyncedAt: When this destination was last successfully synced, or nil if never.
+    ///   - needsFullSync: Whether a full (non-incremental) sync has been requested —
+    ///     e.g. the user changed the "Sync From" date. Destinations that back up
+    ///     historical daily totals (like S3) should widen the window accordingly.
     ///   - now: The current time (injectable for testing).
     /// - Returns: A query window for cumulative metrics, or nil to use the discrete window.
-    func cumulativeQueryWindow(lastSyncedAt: Date?, now: Date) -> QueryWindow?
+    func cumulativeQueryWindow(lastSyncedAt: Date?, needsFullSync: Bool, now: Date) -> QueryWindow?
 
     /// Syncs health data with progress reporting.
     ///

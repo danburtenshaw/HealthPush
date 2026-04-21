@@ -536,6 +536,7 @@ final class SyncEngine {
         let now = Date.now
         let cumulativeWindow = destination.cumulativeQueryWindow(
             lastSyncedAt: config.lastSyncedAt,
+            needsFullSync: config.needsFullSync,
             now: now
         ) ?? defaultCumulativeWindow(now: now)
 

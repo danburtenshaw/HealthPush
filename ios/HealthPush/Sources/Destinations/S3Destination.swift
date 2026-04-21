@@ -95,8 +95,15 @@ struct S3Destination: SyncDestination {
         return QueryWindow(start: start, end: now)
     }
 
-    func cumulativeQueryWindow(lastSyncedAt: Date?, now: Date) -> QueryWindow? {
-        nil // S3 uses the same window for cumulative and discrete
+    func cumulativeQueryWindow(lastSyncedAt: Date?, needsFullSync: Bool, now: Date) -> QueryWindow? {
+        // On a full sync (first sync, or the user changed "Sync From"), widen the
+        // cumulative window to the user-selected start date so historical daily
+        // totals are backfilled — not just the last 3 days. Aggregate UUIDs are
+        // deterministic per (date, metric), so replayed days overwrite idempotently.
+        if needsFullSync {
+            return QueryWindow(start: fullSyncStartDate, end: now)
+        }
+        return nil
     }
 
     /// Syncs health data to S3 with progress reporting.

@@ -169,7 +169,10 @@ enum HealthMetricType: String, CaseIterable, Codable, Identifiable {
 
     /// The canonical unit string for this metric used in exported data.
     ///
-    /// These are the v1 schema contract units. Use ``displayUnit`` for human-facing UI.
+    /// These are the v1 schema contract units. They must match the unit used by
+    /// ``hkUnit`` when converting HealthKit samples — a mismatch means the
+    /// exported payload's `value` and `unit` fields disagree. Use ``displayUnit``
+    /// for human-facing UI strings.
     var canonicalUnit: String {
         switch self {
         case .steps: "count"
@@ -177,16 +180,16 @@ enum HealthMetricType: String, CaseIterable, Codable, Identifiable {
              .basalEnergyBurned,
              .dietaryEnergyConsumed: "kcal"
         case .distanceWalkingRunning,
-             .distanceCycling: "m"
+             .distanceCycling: "km"
         case .flightsClimbed: "count"
         case .appleExerciseTime,
              .appleStandTime,
-             .appleMoveTime: "s"
+             .appleMoveTime: "min"
         case .bodyMass,
              .leanBodyMass: "kg"
         case .bodyMassIndex: "count"
         case .bodyFatPercentage: "fraction"
-        case .height: "m"
+        case .height: "cm"
         case .heartRate,
              .restingHeartRate: "count/min"
         case .heartRateVariabilitySDNN: "ms"

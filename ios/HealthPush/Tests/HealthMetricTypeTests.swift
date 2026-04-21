@@ -99,6 +99,27 @@ struct HealthMetricTypeTests {
         }
     }
 
+    @Test("Canonical units match the unit used to convert HealthKit values")
+    func canonicalUnitsMatchHKUnits() {
+        // These pairs are the metrics most likely to drift (distance, durations,
+        // height) — the value from HealthKit is converted using `hkUnit`, and
+        // `canonicalUnit` is the label sent to destinations. If they disagree,
+        // downstream consumers misinterpret the magnitude (e.g. 6.48 km labeled
+        // "m"). Freeze the expectation here.
+        let expectations: [HealthMetricType: String] = [
+            .distanceWalkingRunning: "km",
+            .distanceCycling: "km",
+            .appleExerciseTime: "min",
+            .appleStandTime: "min",
+            .appleMoveTime: "min",
+            .height: "cm"
+        ]
+        for (metric, expected) in expectations {
+            #expect(metric.canonicalUnit == expected, "\(metric.rawValue) canonicalUnit should be \(expected)")
+            #expect(metric.hkUnit?.unitString == expected, "\(metric.rawValue) hkUnit.unitString should be \(expected)")
+        }
+    }
+
     @Test("All metrics have non-empty display units")
     func displayUnits() {
         for metric in HealthMetricType.allCases {

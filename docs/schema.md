@@ -27,21 +27,25 @@ Each health data record contains the following fields:
 
 ## Canonical Units
 
-| Domain     | Unit         | Notes                                      |
-|------------|--------------|--------------------------------------------|
-| Mass       | `kg`         |                                            |
-| Length     | `m`          |                                            |
-| Energy     | `kcal`       |                                            |
-| Time       | `s`          | Exercise time, stand time, sleep duration  |
-| Temperature| `degC`       |                                            |
-| Pressure   | `mmHg`       | Blood pressure                             |
-| Rate       | `count/min`  | Heart rate, respiratory rate               |
-| HRV        | `ms`         | Heart rate variability                     |
-| Volume     | `mL`         | Water intake                               |
-| Ratio      | `fraction`   | SpO2, body fat (0.0-1.0 range)             |
-| Count      | `count`      | Steps, flights climbed, stand hours        |
-| VO2Max     | `mL/kg/min`  |                                            |
-| Glucose    | `mg/dL`      |                                            |
+Units are per-metric: a record's `unit` field always matches the unit its
+`value` was converted into. See `HealthMetricType.canonicalUnit` for the source
+of truth.
+
+| Metric                             | Unit         | Notes                                      |
+|------------------------------------|--------------|--------------------------------------------|
+| `weight`, `lean_body_mass`         | `kg`         |                                            |
+| `height`                           | `cm`         |                                            |
+| `walking_running_distance`, `cycling_distance` | `km` |                                    |
+| `active_energy`, `resting_energy`, `dietary_energy` | `kcal` |                             |
+| `exercise_minutes`, `stand_time`, `move_time` | `min` |                                    |
+| `sleep`                            | `s`          | Sleep segment duration (end − start)       |
+| `body_temperature`                 | `degC`       |                                            |
+| `blood_pressure_systolic`, `blood_pressure_diastolic` | `mmHg` |                         |
+| `heart_rate`, `resting_heart_rate`, `respiratory_rate` | `count/min` |                   |
+| `hrv`                              | `ms`         | Heart rate variability SDNN                |
+| `water_intake`                     | `mL`         |                                            |
+| `blood_oxygen`, `body_fat`         | `fraction`   | 0.0–1.0 range                              |
+| `steps`, `flights_climbed`, `bmi`  | `count`      |                                            |
 
 ## JSON Record Example
 
